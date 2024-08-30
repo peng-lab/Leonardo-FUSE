@@ -8,6 +8,13 @@ from setuptools import find_packages, setup
 with open("README.md") as readme_file:
     readme = readme_file.read()
 
+def get_cupy_package():
+    import os
+    cuda_version = os.getenv("CUDA_VERSION", "11")
+    if cuda_version.startswith("12"):
+        return "cupy-cuda12x"
+    return "cupy-cuda11x"
+
 setup_requirements = [
     "pytest-runner>=5.2",
 ]
@@ -41,15 +48,19 @@ requirements = [
     "scikit-image",
     "torch",
     "tqdm",
-    "aicsimageio",
+    "aicsimageio", # no longer developed, switch to https://github.com/bioio-devs/bioio
     "antspyx",
     "SimpleITK",
     "opencv-python",
     "colour",
-    "cucim",
+    "cucim", # prevents usage on windows https://github.com/rapidsai/cucim/issues/86
     "open3d",
-    "cupy",
-    "cupyx",
+    get_cupy_package(),
+    # "cupy-cuda11x", # this is the package name for cupy/cupyx, depending on cuda version
+    # "cupy-cuda12x", # cuda needs to be installed beforehand
+
+    # "cupy",
+    # "cupyx",
 ]
 
 extra_requirements = {

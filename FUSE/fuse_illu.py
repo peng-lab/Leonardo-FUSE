@@ -36,11 +36,11 @@ import pandas as pd
 
 pd.set_option("display.width", 10000)
 import dask.array as da
-from typing import Union, Tuple, Optional, List, Dict
+from typing import Union #, Tuple, Optional, List, Dict # unused imports
 import torch
 import os
 from aicsimageio import AICSImage
-import numpy.ma as ma
+# import numpy.ma as ma  # unused import
 import copy
 from scipy import signal
 import torch.nn.functional as F
@@ -50,19 +50,19 @@ try:
     from skimage import filters
 except ImportError:
     from skimage import filter as filters
-import cv2
+# import cv2  # unused import
 import matplotlib.pyplot as plt
 from skimage import morphology
 import matplotlib.patches as patches
 import tqdm
 import gc
 import tifffile
-from FUSE.NSCT import NSCTdec, NSCTrec
+from FUSE.NSCT import NSCTdec #, NSCTrec # unused import
 from FUSE.utils import (
     sgolay2dkernel,
     waterShed,
     refineShape,
-    extendBoundary,
+    # extendBoundary, # unused import
     EM2DPlus,
     fusion_perslice,
     imagej_metadata_tags,
@@ -80,8 +80,12 @@ class FUSE_illu:
         poly_order: list[int, int] = [2, 2],
         n_epochs: int = 50,
         require_segmentation: bool = True,
-        device: str = "cpu",
+        device: str = "cuda",
     ):
+        if device == "cuda" and torch.cuda.is_available():
+            device = torch.device("cuda")
+        else:
+            device = torch.device("cpu")
         self.train_params = {
             "require_precropping": require_precropping,
             "precropping_params": precropping_params,

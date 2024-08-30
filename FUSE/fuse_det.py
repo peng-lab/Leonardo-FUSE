@@ -33,30 +33,30 @@ green = green.astype(np.uint8).T
 
 from FUSE.fuse_illu import FUSE_illu
 from FUSE.utils import (
-    GuidedFilter,
+    # GuidedFilter, # unused import
     sgolay2dkernel,
     waterShed,
     refineShape,
-    extendBoundary,
+    # extendBoundary, # unused import
     EM2DPlus,
     fusion_perslice,
     extendBoundary2,
     imagej_metadata_tags,
 )
 from skimage import measure
-from FUSE.NSCT import NSCTdec, NSCTrec
-from typing import Union, Tuple, Optional, List, Dict
+from FUSE.NSCT import NSCTdec #, NSCTrec # unused import
+from typing import Union, Dict #, Tuple, Optional, List # unused import
 import dask
 import torch
 import os
 from aicsimageio import AICSImage
-import scipy.ndimage as ndimage
+# import scipy.ndimage as ndimage # unused import
 import ants
 import scipy.io as scipyio
 import cupy
 from cucim.skimage import feature
 from cupyx.scipy.ndimage import map_coordinates as map_coordinates
-import cucim
+# import cucim # unused import
 import open3d as o3d
 try:
     from skimage import filters
@@ -64,7 +64,7 @@ except ImportError:
     from skimage import filter as filters
 from skimage import morphology
 import shutil
-import io
+# import io # unused import
 import copy
 import SimpleITK as sitk
 import tqdm
@@ -94,6 +94,10 @@ class FUSE_det:
         destripe_params: Dict = None,
         device: str = "cuda",
     ):
+        if device == "cuda" and torch.cuda.is_available():
+            device = torch.device("cuda")
+        else:
+            device = torch.device("cpu")
         self.train_params = {
             "require_precropping": require_precropping,
             "precropping_params": precropping_params,
