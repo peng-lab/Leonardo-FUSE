@@ -82,10 +82,8 @@ class FUSE_illu:
         require_segmentation: bool = True,
         device: str = "cuda",
     ):
-        if device == "cuda" and torch.cuda.is_available():
-            device = torch.device("cuda")
-        else:
-            device = torch.device("cpu")
+        if not (device == "cuda" and torch.cuda.is_available()):
+            device = "cpu"
         self.train_params = {
             "require_precropping": require_precropping,
             "precropping_params": precropping_params,
