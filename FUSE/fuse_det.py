@@ -94,7 +94,7 @@ class FUSE_det:
         destripe_params: Dict = None,
         device: str = "cuda",
     ):
-        if !(device == "cuda" and torch.cuda.is_available()):
+        if not (device == "cuda" and torch.cuda.is_available()):
             device = "cpu"
         self.train_params = {
             "require_precropping": require_precropping,
