@@ -1,4 +1,6 @@
 from datetime import datetime
+
+
 def make_Ramp(ramp_colors):
     from colour import Color
     from matplotlib.colors import LinearSegmentedColormap
@@ -47,7 +49,8 @@ from FUSE.utils import (
 )
 from skimage import measure
 from FUSE.NSCT import NSCTdec, NSCTrec
-#from FUSE.blobs_dog import blob_dog
+
+# from FUSE.blobs_dog import blob_dog
 from typing import Union, Tuple, Optional, List, Dict
 import dask
 import torch
@@ -57,6 +60,7 @@ import scipy.ndimage as ndimage
 import ants
 import scipy.io as scipyio
 import open3d as o3d
+
 try:
     from skimage import filters
 except ImportError:
@@ -80,6 +84,7 @@ import tifffile
 import sys
 import h5py
 
+
 def define_registration_params(
     skip_registration: bool = True,
     skip_transformation: bool = True,
@@ -89,26 +94,25 @@ def define_registration_params(
     kwargs = locals()
     return kwargs
 
+
 def DoG(input, device):
     points = []
-    for ind in tqdm.tqdm(
-        range(input.shape[0]), leave=False, desc="DoG: "
-    ):
+    for ind in tqdm.tqdm(range(input.shape[0]), leave=False, desc="DoG: "):
         tmp = blob_dog(
             input[ind],
             min_sigma=1.8,
             max_sigma=1.8 * 1.6 + 1,
             threshold=0.001,
-            th = filters.threshold_otsu(input[ind]),
-            device = device,
+            th=filters.threshold_otsu(input[ind]),
         )[:, :-1]
         if tmp.shape[0] != 0:
             tmp = tmp.cpu().data.numpy()
-            tmp = np.concatenate(
-                (ind * np.ones((tmp.shape[0], 1)), tmp), 1
-            ).astype(np.int32)
+            tmp = np.concatenate((ind * np.ones((tmp.shape[0], 1)), tmp), 1).astype(
+                np.int32
+            )
             points.append(tmp)
     return points
+
 
 class FUSE_det:
     def __init__(
@@ -122,11 +126,9 @@ class FUSE_det:
         require_segmentation: bool = True,
         skip_illuFusion: bool = True,
         destripe_params: str = "",
-        device: str = None,
-        registration_params = None,
+        device: str = "cuda",
+        registration_params=None,
     ):
-        if device == None:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.train_params = {
             "require_precropping": require_precropping,
             "precropping_params": precropping_params,
@@ -169,7 +171,7 @@ class FUSE_det:
         """Parses training parameters from dictionary"""
         if params["method"] != "detection":
             raise ValueError(f"Invalid method: {params['method']}")
-        if params["amount"] not in [2,4]:
+        if params["amount"] not in [2, 4]:
             raise ValueError("Only 2 or 4 images are supported for detection")
         image1 = params["image1"]
         image3 = params["image3"]
@@ -210,9 +212,11 @@ class FUSE_det:
                     f"Invalid directions for ventral detection: {direction1}, {direction2}"
                 )
 
-            if (direction3 not in [direction1, direction2]
+            if (
+                direction3 not in [direction1, direction2]
                 or direction4 not in [direction1, direction2]
-                or direction3 == direction4):
+                or direction3 == direction4
+            ):
                 raise ValueError(
                     f"Invalid directions for dorsal detection: {direction3}, {direction4}"
                 )
@@ -233,16 +237,22 @@ class FUSE_det:
         else:
             ventral_data = image1
             dorsal_data = image3
-            if (direction1 in ["Top", "Bottom"]
+            if (
+                direction1 in ["Top", "Bottom"]
                 and direction3 in ["Top", "Bottom"]
-                and direction1 != direction3):
+                and direction1 != direction3
+            ):
                 left_right = False
-            elif (direction1 in ["Left", "Right"]
-                  and direction3 in ["Left", "Right"]
-                  and direction1 != direction3):
+            elif (
+                direction1 in ["Left", "Right"]
+                and direction3 in ["Left", "Right"]
+                and direction1 != direction3
+            ):
                 left_right = True
             else:
-                raise ValueError(f"Invalid directions for detection: {direction1}, {direction3}")
+                raise ValueError(
+                    f"Invalid directions for detection: {direction1}, {direction3}"
+                )
 
         require_registration = params["require_registration"]
         xy_spacing, z_spacing = None, None
@@ -296,13 +306,13 @@ class FUSE_det:
         right_illu_ventral_det_data: Union[dask.array.core.Array, str] = None,
         left_illu_dorsal_det_data: Union[dask.array.core.Array, str] = None,
         right_illu_dorsal_det_data: Union[dask.array.core.Array, str] = None,
-        ventral_det_data:  Union[dask.array.core.Array, str] = None,
-        dorsal_det_data:  Union[dask.array.core.Array, str] = None,
+        ventral_det_data: Union[dask.array.core.Array, str] = None,
+        dorsal_det_data: Union[dask.array.core.Array, str] = None,
         save_path: str = "",
         save_folder: str = "",
         save_separate_results: bool = False,
-        z_spacing: float = None,#axial
-        xy_spacing: float = None,#lateral
+        z_spacing: float = None,  # axial
+        xy_spacing: float = None,  # lateral
         left_right: bool = None,
     ):
         if require_registration:
@@ -310,8 +320,12 @@ class FUSE_det:
                 print("spacing information is missing.")
                 return
         illu_name = "illuFusionResult{}{}".format(
-            "" if self.train_params["require_segmentation"] else "_without_segmentation",
-            self.train_params["destripe_params"]
+            (
+                ""
+                if self.train_params["require_segmentation"]
+                else "_without_segmentation"
+            ),
+            self.train_params["destripe_params"],
         )
         if not os.path.exists(save_path):
             print("saving path does not exist.")
@@ -437,9 +451,7 @@ class FUSE_det:
                     os.path.splitext(dorsal_det_data)[0]
                 )
             else:
-                self.sample_params["topillu_dorsaldet_data_saving_name"] = (
-                    "dorsal_det"
-                )
+                self.sample_params["topillu_dorsaldet_data_saving_name"] = "dorsal_det"
         else:
             print("input(s) missing, please check.")
             return
@@ -522,12 +534,15 @@ class FUSE_det:
         data_path = os.path.join(data_path, sample_name)
 
         if require_registration:
-            if (not os.path.exists(
-                os.path.join(
-                    save_path, self.sample_params["topillu_ventraldet_data_saving_name"]
+            if (
+                not os.path.exists(
+                    os.path.join(
+                        save_path,
+                        self.sample_params["topillu_ventraldet_data_saving_name"],
+                    )
+                    + "/regInfo.npy"
                 )
-                + "/regInfo.npy"
-            )) or (self.registration_params["skip_registration"] == False):
+            ) or (self.registration_params["skip_registration"] == False):
                 print("\nRegister...")
                 print("read in...")
 
@@ -547,16 +562,25 @@ class FUSE_det:
                             illu_name_,
                         )
                     )
-                    respective_view_uint16 = respective_view_uint16_handle.get_image_data(
-                        "ZXY" if T_flag else "ZYX", T=0, C=0
+                    respective_view_uint16 = (
+                        respective_view_uint16_handle.get_image_data(
+                            "ZXY" if T_flag else "ZYX", T=0, C=0
+                        )
                     )
                     moving_view_uint16 = moving_view_uint16_handle.get_image_data(
                         "ZXY" if T_flag else "ZYX", T=0, C=0
                     )
                 else:
                     if isinstance(ventral_det_data, str):
-                        data_handle = AICSImage(os.path.join(data_path,ventral_det_data,))
-                        respective_view_uint16 = data_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+                        data_handle = AICSImage(
+                            os.path.join(
+                                data_path,
+                                ventral_det_data,
+                            )
+                        )
+                        respective_view_uint16 = data_handle.get_image_data(
+                            "ZXY" if T_flag else "ZYX", T=0, C=0
+                        )
                     else:
                         if T_flag:
                             tmp = copy.deepcopy(ventral_det_data)
@@ -565,8 +589,15 @@ class FUSE_det:
                         else:
                             respective_view_uint16 = copy.deepcopy(ventral_det_data)
                     if isinstance(dorsal_det_data, str):
-                        data_handle = AICSImage(os.path.join(data_path,dorsal_det_data,))
-                        moving_view_uint16 = data_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+                        data_handle = AICSImage(
+                            os.path.join(
+                                data_path,
+                                dorsal_det_data,
+                            )
+                        )
+                        moving_view_uint16 = data_handle.get_image_data(
+                            "ZXY" if T_flag else "ZYX", T=0, C=0
+                        )
                     else:
                         if T_flag:
                             tmp = copy.deepcopy(dorsal_det_data)
@@ -657,7 +688,7 @@ class FUSE_det:
                     ),
                     z_spacing=self.sample_params["z_spacing"],
                     xy_spacing=self.sample_params["xy_spacing"],
-                    registration_params = self.registration_params,
+                    registration_params=self.registration_params,
                 )
                 del respective_view_uint16_pad, moving_view_uint16_pad
                 reg_info.update(
@@ -689,10 +720,8 @@ class FUSE_det:
                             else z
                         )
                         * self.sample_params["z_spacing"],
-                        m
-                        * self.sample_params["xy_spacing"],
-                        n
-                        * self.sample_params["xy_spacing"],
+                        m * self.sample_params["xy_spacing"],
+                        n * self.sample_params["xy_spacing"],
                         spacing=self.sample_params["z_spacing"],
                     )
                     / self.sample_params["z_spacing"]
@@ -700,7 +729,11 @@ class FUSE_det:
                 trans_path = os.path.join(
                     save_path,
                     self.sample_params["topillu_dorsaldet_data_saving_name"],
-                    "{}_coarse_reg.tif".format(illu_name if not det_only_flag else self.sample_params["topillu_dorsaldet_data_saving_name"]),
+                    "{}_coarse_reg.tif".format(
+                        illu_name
+                        if not det_only_flag
+                        else self.sample_params["topillu_dorsaldet_data_saving_name"]
+                    ),
                 )
 
                 volumeTranslate_compose(
@@ -725,13 +758,15 @@ class FUSE_det:
             else:
                 print("\nSkip registration...")
 
-            if (not os.path.exists(
-                os.path.join(
-                    save_path,
-                    self.sample_params["topillu_ventraldet_data_saving_name"],
-                    "regInfo_refine.npy",
+            if (
+                not os.path.exists(
+                    os.path.join(
+                        save_path,
+                        self.sample_params["topillu_ventraldet_data_saving_name"],
+                        "regInfo_refine.npy",
+                    )
                 )
-            )) or (self.registration_params["skip_transformation"] == False):
+            ) or (self.registration_params["skip_transformation"] == False):
                 print("refine registration...")
 
                 if not det_only_flag:
@@ -750,16 +785,25 @@ class FUSE_det:
                             illu_name_ + "_coarse_reg.tif",
                         )
                     )
-                    respective_view_uint16 = respective_view_uint16_handle.get_image_data(
-                        "ZXY" if T_flag else "ZYX", T=0, C=0
+                    respective_view_uint16 = (
+                        respective_view_uint16_handle.get_image_data(
+                            "ZXY" if T_flag else "ZYX", T=0, C=0
+                        )
                     )
                     moving_view_uint16 = moving_view_uint16_handle.get_image_data(
                         "ZXY" if T_flag else "ZYX", T=0, C=0
                     )
                 else:
                     if isinstance(ventral_det_data, str):
-                        data_handle = AICSImage(os.path.join(data_path,ventral_det_data,))
-                        respective_view_uint16 = data_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+                        data_handle = AICSImage(
+                            os.path.join(
+                                data_path,
+                                ventral_det_data,
+                            )
+                        )
+                        respective_view_uint16 = data_handle.get_image_data(
+                            "ZXY" if T_flag else "ZYX", T=0, C=0
+                        )
                     else:
                         if T_flag:
                             tmp = copy.deepcopy(ventral_det_data)
@@ -775,19 +819,26 @@ class FUSE_det:
                         os.path.join(
                             save_path,
                             self.sample_params["topillu_dorsaldet_data_saving_name"],
-                            self.sample_params["topillu_dorsaldet_data_saving_name"] + "_coarse_reg.tif",
+                            self.sample_params["topillu_dorsaldet_data_saving_name"]
+                            + "_coarse_reg.tif",
                         )
                     )
-                    moving_view_uint16 = moving_view_uint16_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+                    moving_view_uint16 = moving_view_uint16_handle.get_image_data(
+                        "ZXY" if T_flag else "ZYX", T=0, C=0
+                    )
 
-                target_points = DoG(respective_view_uint16, device = self.train_params["device"])
-                source_points = DoG(moving_view_uint16, device = self.train_params["device"])
+                target_points = DoG(
+                    respective_view_uint16, device=self.train_params["device"]
+                )
+                source_points = DoG(
+                    moving_view_uint16, device=self.train_params["device"]
+                )
 
                 source_points = np.concatenate(source_points, 0)
                 target_points = np.concatenate(target_points, 0)
 
-                if source_points.shape[0]>1e6:
-                    d = int(source_points.shape[0]//1e6)
+                if source_points.shape[0] > 1e6:
+                    d = int(source_points.shape[0] // 1e6)
                 else:
                     d = 1
 
@@ -854,7 +905,14 @@ class FUSE_det:
                     os.path.join(
                         save_path,
                         self.sample_params["topillu_dorsaldet_data_saving_name"],
-                        "{}".format(illu_name_ if not det_only_flag else self.sample_params["topillu_dorsaldet_data_saving_name"]) + "_reg.tif",
+                        "{}".format(
+                            illu_name_
+                            if not det_only_flag
+                            else self.sample_params[
+                                "topillu_dorsaldet_data_saving_name"
+                            ]
+                        )
+                        + "_reg.tif",
                     ),
                     T_flag,
                     tuple([]),
@@ -885,10 +943,8 @@ class FUSE_det:
                             else z
                         )
                         * self.sample_params["z_spacing"],
-                        m
-                        * self.sample_params["xy_spacing"],
-                        n
-                        * self.sample_params["xy_spacing"],
+                        m * self.sample_params["xy_spacing"],
+                        n * self.sample_params["xy_spacing"],
                         spacing=self.sample_params["z_spacing"],
                     )
                     / self.sample_params["z_spacing"]
@@ -902,7 +958,9 @@ class FUSE_det:
                         "translating_information.npy",
                     ),
                     {
-                        "AffineTransform_float_3_3_inverse": regInfo["AffineTransform_float_3_3_inverse"],
+                        "AffineTransform_float_3_3_inverse": regInfo[
+                            "AffineTransform_float_3_3_inverse"
+                        ],
                         "fixed_inverse": regInfo["fixed_inverse"],
                         "AffineMapZXY": AffineMapZXY,
                         "T2": T2,
@@ -934,8 +992,12 @@ class FUSE_det:
                         )
                         trans_path = os.path.join(
                             save_path,
-                            self.sample_params[f_name + "illu_dorsaldet_data_saving_name"],
-                            self.sample_params[f_name + "illu_dorsaldet_data_saving_name"]
+                            self.sample_params[
+                                f_name + "illu_dorsaldet_data_saving_name"
+                            ],
+                            self.sample_params[
+                                f_name + "illu_dorsaldet_data_saving_name"
+                            ]
                             + "_reg.tif",
                         )
 
@@ -973,8 +1035,7 @@ class FUSE_det:
                     trans_path = os.path.join(
                         save_path,
                         self.sample_params["topillu_dorsaldet_data_saving_name"],
-                        fl
-                        + "_reg.npy",
+                        fl + "_reg.npy",
                     )
                     volumeTranslate_compose(
                         mask,
@@ -1001,14 +1062,23 @@ class FUSE_det:
         if not det_only_flag:
             f_handle = AICSImage(
                 os.path.join(
-                    save_path, self.sample_params["topillu_ventraldet_data_saving_name"], fl
+                    save_path,
+                    self.sample_params["topillu_ventraldet_data_saving_name"],
+                    fl,
                 )
             )
             illu_front = f_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
         else:
             if isinstance(ventral_det_data, str):
-                data_handle = AICSImage(os.path.join(data_path,ventral_det_data,))
-                illu_front = data_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+                data_handle = AICSImage(
+                    os.path.join(
+                        data_path,
+                        ventral_det_data,
+                    )
+                )
+                illu_front = data_handle.get_image_data(
+                    "ZXY" if T_flag else "ZYX", T=0, C=0
+                )
             else:
                 if T_flag:
                     tmp = copy.deepcopy(ventral_det_data)
@@ -1019,22 +1089,62 @@ class FUSE_det:
                 if isinstance(illu_front, da.Array):
                     illu_front = illu_front.compute()
 
-        f_handle = AICSImage(
-            os.path.join(
-                save_path,
-                self.sample_params["topillu_dorsaldet_data_saving_name"],
-                "{}".format(illu_name if not det_only_flag else self.sample_params["topillu_dorsaldet_data_saving_name"])
-                + "{}.tif".format(
-                    "_reg" if require_registration else "",
-                ),
+        if not det_only_flag:
+            f_handle = AICSImage(
+                os.path.join(
+                    save_path,
+                    self.sample_params["topillu_dorsaldet_data_saving_name"],
+                    "{}".format(illu_name)
+                    + "{}.tif".format(
+                        "_reg" if require_registration else "",
+                    ),
+                )
             )
-        )
-        illu_back = f_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+            illu_back = f_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+        else:
+            if require_registration:
+                f_handle = AICSImage(
+                    os.path.join(
+                        save_path,
+                        self.sample_params["topillu_dorsaldet_data_saving_name"],
+                        "{}".format(
+                            self.sample_params["topillu_dorsaldet_data_saving_name"]
+                        )
+                        + "{}.tif".format(
+                            "_reg" if require_registration else "",
+                        ),
+                    )
+                )
+                illu_back = f_handle.get_image_data(
+                    "ZXY" if T_flag else "ZYX", T=0, C=0
+                )
+            else:
+                if isinstance(dorsal_det_data, str):
+                    data_handle = AICSImage(
+                        os.path.join(
+                            data_path,
+                            dorsal_det_data,
+                        )
+                    )
+                    illu_back = data_handle.get_image_data(
+                        "ZXY" if T_flag else "ZYX", T=0, C=0
+                    )
+                else:
+                    if T_flag:
+                        tmp = copy.deepcopy(dorsal_det_data)
+                        illu_back = tmp.swapaxes(1, 2)
+                        del tmp
+                    else:
+                        illu_back = copy.deepcopy(dorsal_det_data)
+                    if isinstance(illu_back, da.Array):
+                        illu_back = illu_back.compute()
 
         if not require_registration:
             illu_back[:] = np.flip(illu_back, flip_axes)
 
-        cropInfo = self.localizingSample(illu_front.max(0), illu_back.max(0), save_path, det_only_flag)
+        cropInfo = self.localizingSample(
+            illu_front.max(0), illu_back.max(0), save_path, det_only_flag
+        )
         print(cropInfo)
 
         if self.train_params["require_precropping"]:
@@ -1111,11 +1221,14 @@ class FUSE_det:
                 )
             ).transpose(2, 0, 1)
         else:
-            segMask = np.ones(illu_back[:, xs:xe, ys:ye][
+            segMask = np.ones(
+                illu_back[:, xs:xe, ys:ye][
                     :,
                     :: self.train_params["resample_ratio"],
                     :: self.train_params["resample_ratio"],
-                ].shape, dtype = bool)
+                ].shape,
+                dtype=bool,
+            )
 
         if not det_only_flag:
             print("\nFor top/left Illu...")
@@ -1146,11 +1259,20 @@ class FUSE_det:
                         "{}_illu_ventral_det_data".format("left" if T_flag else "top")
                     ]
                 )
-            rawPlanesTopO = top_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+            rawPlanesTopO = top_handle.get_image_data(
+                "ZXY" if T_flag else "ZYX", T=0, C=0
+            )
         else:
             if isinstance(ventral_det_data, str):
-                data_handle = AICSImage(os.path.join(data_path,ventral_det_data,))
-                rawPlanesTopO = data_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+                data_handle = AICSImage(
+                    os.path.join(
+                        data_path,
+                        ventral_det_data,
+                    )
+                )
+                rawPlanesTopO = data_handle.get_image_data(
+                    "ZXY" if T_flag else "ZYX", T=0, C=0
+                )
             else:
                 if T_flag:
                     tmp = copy.deepcopy(ventral_det_data)
@@ -1169,7 +1291,9 @@ class FUSE_det:
 
         if require_registration:
             if not det_only_flag:
-                bottom_name = "bottom" if require_flipping_along_illu_for_dorsaldet else "top"
+                bottom_name = (
+                    "bottom" if require_flipping_along_illu_for_dorsaldet else "top"
+                )
             else:
                 bottom_name = "top"
             bottom_handle = AICSImage(
@@ -1190,22 +1314,21 @@ class FUSE_det:
                     illu_direct = "right" if T_flag else "bottom"
                 else:
                     illu_direct = "left" if T_flag else "top"
+                _name = locals()["{}_illu_dorsal_det_data".format(illu_direct)]
             else:
-                illu_direct = "top"
+                _name = dorsal_det_data
             if isinstance(
-                locals()["{}_illu_dorsal_det_data".format(illu_direct)],
+                _name,
                 str,
             ):
                 bottom_handle = AICSImage(
                     os.path.join(
                         data_path,
-                        locals()["{}_illu_dorsal_det_data".format(illu_direct)],
+                        _name,
                     )
                 )
             else:
-                bottom_handle = AICSImage(
-                    locals()["{}_illu_dorsal_det_data".format(illu_direct)]
-                )
+                bottom_handle = AICSImage(_name)
 
         rawPlanesBottomO = bottom_handle.get_image_data(
             "ZXY" if T_flag else "ZYX", T=0, C=0
@@ -1315,7 +1438,9 @@ class FUSE_det:
                     ]
                 )
 
-            rawPlanesTopO = top_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+            rawPlanesTopO = top_handle.get_image_data(
+                "ZXY" if T_flag else "ZYX", T=0, C=0
+            )
             rawPlanesToptmp = rawPlanesTopO[:, xs:xe, ys:ye]
             _, m_c, n_c = rawPlanesToptmp.shape
             m = len(np.arange(m_c)[:: self.train_params["resample_ratio"]])
@@ -1465,8 +1590,7 @@ class FUSE_det:
                     os.path.join(
                         save_path,
                         self.sample_params["topillu_dorsaldet_data_saving_name"],
-                        fl
-                        + "_reg.npy",
+                        fl + "_reg.npy",
                     )
                 )
             else:
@@ -1525,14 +1649,23 @@ class FUSE_det:
 
             f_handle = AICSImage(
                 os.path.join(
-                    save_path, self.sample_params["topillu_ventraldet_data_saving_name"], fl
+                    save_path,
+                    self.sample_params["topillu_ventraldet_data_saving_name"],
+                    fl,
                 )
             )
             illu_front = f_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
         else:
             if isinstance(ventral_det_data, str):
-                data_handle = AICSImage(os.path.join(data_path,ventral_det_data,))
-                illu_front = data_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+                data_handle = AICSImage(
+                    os.path.join(
+                        data_path,
+                        ventral_det_data,
+                    )
+                )
+                illu_front = data_handle.get_image_data(
+                    "ZXY" if T_flag else "ZYX", T=0, C=0
+                )
             else:
                 if T_flag:
                     tmp = copy.deepcopy(ventral_det_data)
@@ -1549,7 +1682,11 @@ class FUSE_det:
                 os.path.join(
                     save_path,
                     self.sample_params["topillu_dorsaldet_data_saving_name"],
-                    "{}".format(illu_name if not det_only_flag else self.sample_params["topillu_dorsaldet_data_saving_name"])
+                    "{}".format(
+                        illu_name
+                        if not det_only_flag
+                        else self.sample_params["topillu_dorsaldet_data_saving_name"]
+                    )
                     + "_reg.tif",
                 )
             )
@@ -1563,11 +1700,20 @@ class FUSE_det:
                         fl,
                     )
                 )
-                illu_back = f_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+                illu_back = f_handle.get_image_data(
+                    "ZXY" if T_flag else "ZYX", T=0, C=0
+                )
             else:
                 if isinstance(dorsal_det_data, str):
-                    data_handle = AICSImage(os.path.join(data_path,dorsal_det_data,))
-                    illu_back = data_handle.get_image_data("ZXY" if T_flag else "ZYX", T=0, C=0)
+                    data_handle = AICSImage(
+                        os.path.join(
+                            data_path,
+                            dorsal_det_data,
+                        )
+                    )
+                    illu_back = data_handle.get_image_data(
+                        "ZXY" if T_flag else "ZYX", T=0, C=0
+                    )
                 else:
                     if T_flag:
                         tmp = copy.deepcopy(dorsal_det_data)
@@ -1662,20 +1808,22 @@ class FUSE_det:
         else:
             if save_separate_results:
                 reconVol, reconVol_separate = fusionResult(
-                            illu_front,
-                            illu_back,
-                            boundaryTop,
-                            self.train_params["device"],
-                            save_separate_results,
-                            GFr=copy.deepcopy(self.train_params["window_size"]),)
+                    illu_front,
+                    illu_back,
+                    boundaryTop,
+                    self.train_params["device"],
+                    save_separate_results,
+                    GFr=copy.deepcopy(self.train_params["window_size"]),
+                )
             else:
                 reconVol = fusionResult(
-                            illu_front,
-                            illu_back,
-                            boundaryTop,
-                            self.train_params["device"],
-                            save_separate_results,
-                            GFr=copy.deepcopy(self.train_params["window_size"]),)
+                    illu_front,
+                    illu_back,
+                    boundaryTop,
+                    self.train_params["device"],
+                    save_separate_results,
+                    GFr=copy.deepcopy(self.train_params["window_size"]),
+                )
 
         if T_flag:
             result = reconVol.swapaxes(1, 2)
@@ -1733,24 +1881,24 @@ class FUSE_det:
         gc.collect()
         return result
 
-
-    def apply(self,
-              require_registration: bool,
-              data_path: str,
-              sample_name: str,
-              save_path: str,
-              save_folder: str,
-              ventral_det_data_path: str,
-              dorsal_det_data_path: str,
-              boundary_path: str,
-              translating_information: str,
-              z_upsample_ratio: int = 1,
-              xy_upsample_ratio: int = 1,
-              z_spacing: int = None,
-              xy_spacing: int = None,
-              skip_apply_registration: bool = False,
-              skip_refine_registration: bool = False,
-              window_size = [5, 59],
+    def apply(
+        self,
+        require_registration: bool,
+        data_path: str,
+        sample_name: str,
+        save_path: str,
+        save_folder: str,
+        ventral_det_data_path: str,
+        dorsal_det_data_path: str,
+        boundary_path: str,
+        translating_information: str,
+        z_upsample_ratio: int = 1,
+        xy_upsample_ratio: int = 1,
+        z_spacing: int = None,
+        xy_spacing: int = None,
+        skip_apply_registration: bool = False,
+        skip_refine_registration: bool = False,
+        window_size=[5, 59],
     ):
         if not os.path.exists(save_path):
             print("saving path does not exist.")
@@ -1768,15 +1916,21 @@ class FUSE_det:
                 print("spacing information is missing.")
                 return
 
-        ventral_det_data_handle = h5py.File(os.path.join(data_path, sample_name, ventral_det_data_path), "r")
+        ventral_det_data_handle = h5py.File(
+            os.path.join(data_path, sample_name, ventral_det_data_path), "r"
+        )
         ventral_det_data = ventral_det_data_handle["X"]
-        dorsal_det_data_handle = h5py.File(os.path.join(data_path, sample_name, dorsal_det_data_path), "r")
+        dorsal_det_data_handle = h5py.File(
+            os.path.join(data_path, sample_name, dorsal_det_data_path), "r"
+        )
         dorsal_det_data = dorsal_det_data_handle["X"]
 
         xy_spacing = xy_spacing / xy_upsample_ratio
         z_spacing = z_spacing / z_upsample_ratio
 
-        trans_path = os.path.join(save_path, "high_res", os.path.splitext(dorsal_det_data_path)[0]+"_reg.h5")
+        trans_path = os.path.join(
+            save_path, "high_res", os.path.splitext(dorsal_det_data_path)[0] + "_reg.h5"
+        )
         if (not skip_apply_registration) or (not os.path.exists(trans_path)):
             print("Apply registration...")
             zback = dorsal_det_data.shape[0]
@@ -1784,16 +1938,22 @@ class FUSE_det:
             m = ventral_det_data.shape[1]
             n = ventral_det_data.shape[2]
 
-            translating_information = np.load(translating_information, allow_pickle=True).item()
+            translating_information = np.load(
+                translating_information, allow_pickle=True
+            ).item()
 
-            AffineTransform_float_3_3_inverse = translating_information["AffineTransform_float_3_3_inverse"]
+            AffineTransform_float_3_3_inverse = translating_information[
+                "AffineTransform_float_3_3_inverse"
+            ]
             fixed_inverse = translating_information["fixed_inverse"]
             T2 = translating_information["T2"]
             T_flag = translating_information["T_flag"]
             flip_axes = translating_information["flip_axes"]
 
-            AffineMapZXY = translating_information["AffineMapZXY"]*np.array([z_upsample_ratio, xy_upsample_ratio, xy_upsample_ratio])
-            padding_z = translating_information["padding_z"]*z_upsample_ratio
+            AffineMapZXY = translating_information["AffineMapZXY"] * np.array(
+                [z_upsample_ratio, xy_upsample_ratio, xy_upsample_ratio]
+            )
+            padding_z = translating_information["padding_z"] * z_upsample_ratio
 
             volumeTranslate_compose(
                 dorsal_det_data,
@@ -1812,25 +1972,36 @@ class FUSE_det:
                 device=self.train_params["device"],
                 xy_spacing=xy_spacing,
                 z_spacing=z_spacing,
-                high_res = True,
+                high_res=True,
             )
             dorsal_det_data_handle.close()
         else:
             print("Skip coase registration...")
 
-        trans_path = os.path.join(save_path, "high_res", os.path.splitext(dorsal_det_data_path)[0]+"_fine_reg.h5")
+        trans_path = os.path.join(
+            save_path,
+            "high_res",
+            os.path.splitext(dorsal_det_data_path)[0] + "_fine_reg.h5",
+        )
         if (not skip_refine_registration) or (not os.path.exists(trans_path)):
-            dorsal_det_data_handle = h5py.File(os.path.join(save_path, "high_res", os.path.splitext(dorsal_det_data_path)[0]+"_reg.h5"), "r")
+            dorsal_det_data_handle = h5py.File(
+                os.path.join(
+                    save_path,
+                    "high_res",
+                    os.path.splitext(dorsal_det_data_path)[0] + "_reg.h5",
+                ),
+                "r",
+            )
             dorsal_det_data = dorsal_det_data_handle["X"]
 
-            target_points = DoG(ventral_det_data, device = self.train_params["device"])
-            source_points = DoG(dorsal_det_data, device = self.train_params["device"])
+            target_points = DoG(ventral_det_data, device=self.train_params["device"])
+            source_points = DoG(dorsal_det_data, device=self.train_params["device"])
 
             source_points = np.concatenate(source_points, 0)
             target_points = np.concatenate(target_points, 0)
 
-            if source_points.shape[0]>1e7:
-                d = int(source_points.shape[0]//1e7)
+            if source_points.shape[0] > 1e7:
+                d = int(source_points.shape[0] // 1e7)
             else:
                 d = 1
 
@@ -1865,9 +2036,7 @@ class FUSE_det:
                 o3d.pipelines.registration.TransformationEstimationPointToPoint(
                     with_scaling=True
                 ),
-                o3d.pipelines.registration.ICPConvergenceCriteria(
-                    max_iteration=5000
-                ),
+                o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=5000),
             )
             np.save(
                 os.path.join(
@@ -1899,26 +2068,41 @@ class FUSE_det:
                 device=self.train_params["device"],
                 xy_spacing=xy_spacing,
                 z_spacing=z_spacing,
-                high_res = True,
+                high_res=True,
             )
             dorsal_det_data_handle.close()
         else:
             print("Skip refine registration...")
 
         boundary = tifffile.imread(boundary_path)
-        dorsal_det_data_handle = h5py.File(os.path.join(save_path, "high_res", os.path.splitext(dorsal_det_data_path)[0]+"_fine_reg.h5"), "r")
+        dorsal_det_data_handle = h5py.File(
+            os.path.join(
+                save_path,
+                "high_res",
+                os.path.splitext(dorsal_det_data_path)[0] + "_fine_reg.h5",
+            ),
+            "r",
+        )
         dorsal_det_data = dorsal_det_data_handle["X"]
         z, x, y = dorsal_det_data.shape
-        boundary = z_upsample_ratio*F.interpolate(torch.from_numpy(boundary[None, None].astype(np.float32)),
-                                                  size = (x, y), mode = "bilinear", align_corners = True).data.numpy()[0, 0]
+        boundary = (
+            z_upsample_ratio
+            * F.interpolate(
+                torch.from_numpy(boundary[None, None].astype(np.float32)),
+                size=(x, y),
+                mode="bilinear",
+                align_corners=True,
+            ).data.numpy()[0, 0]
+        )
 
         reconVol = fusionResult(
-                    ventral_det_data,
-                    dorsal_det_data,
-                    boundary,
-                    self.train_params["device"],
-                    False,
-                    GFr=window_size,)
+            ventral_det_data,
+            dorsal_det_data,
+            boundary,
+            self.train_params["device"],
+            False,
+            GFr=window_size,
+        )
 
         print("Save...")
         trans_path = os.path.join(save_path, "high_res", "quadrupleFusionResult.h5")
@@ -1931,7 +2115,6 @@ class FUSE_det:
         del reconVol
         dorsal_det_data_handle.close()
         ventral_det_data_handle.close()
-
 
     def save_results(self, save_path, reconVol_separate):
         ijtags = imagej_metadata_tags(
@@ -2018,7 +2201,9 @@ class FUSE_det:
             Min, Max = [], []
             th = 0
             allList = [
-                value for key, value in self.sample_params.items() if "saving_name" in key
+                value
+                for key, value in self.sample_params.items()
+                if "saving_name" in key
             ]
             for f in allList:
                 t = np.load(
@@ -2049,7 +2234,7 @@ class FUSE_det:
             x_top = topVol[i]
             x_bottom = bottomVol[i]
             if det_only_flag:
-                th = filters.threshold_otsu(x_top+.0+x_bottom)/2
+                th = filters.threshold_otsu(x_top + 0.0 + x_bottom) / 2
                 Min = max(x_top.min(), x_bottom.min())
                 Max = max(x_top.max(), x_bottom.max())
             th_top = 255 * (morphology.remove_small_objects(x_top > th, 25)).astype(
@@ -2075,7 +2260,9 @@ class FUSE_det:
         del topSegMask, bottomSegMask, topVol, bottomVol
         return segMask
 
-    def localizingSample(self, rawPlanes_ventral, rawPlanes_dorsal, info_path, det_only_flag):
+    def localizingSample(
+        self, rawPlanes_ventral, rawPlanes_dorsal, info_path, det_only_flag
+    ):
         cropInfo = pd.DataFrame(
             columns=["startX", "endX", "startY", "endY", "maxv"],
             index=["ventral", "dorsal"],
@@ -2146,6 +2333,7 @@ class FUSE_det:
         )
         return a, b, c, d
 
+
 def fusionResult(
     topVol,
     bottomVol,
@@ -2164,9 +2352,9 @@ def fusionResult(
 
     l = np.concatenate(
         (
-            np.zeros(GFr[0] // 2, dtype = np.int32),
+            np.zeros(GFr[0] // 2, dtype=np.int32),
             np.arange(s),
-            (s-1)*np.ones(s - GFr[0] // 2 - (s - GFr[0] + 1), dtype = np.int32)
+            (s - 1) * np.ones(s - GFr[0] // 2 - (s - GFr[0] + 1), dtype=np.int32),
         ),
         0,
     )
@@ -2182,18 +2370,18 @@ def fusionResult(
 
         ind = ii - GFr[0] // 2
 
-        topVol_tmp = np.zeros((len(l_s), m, n), dtype = np.float32)
-        bottomVol_tmp = np.zeros((len(l_s), m, n), dtype = np.float32)
+        topVol_tmp = np.zeros((len(l_s), m, n), dtype=np.float32)
+        bottomVol_tmp = np.zeros((len(l_s), m, n), dtype=np.float32)
 
-        indd = np.where(l_s<topVol.shape[0])[0]
+        indd = np.where(l_s < topVol.shape[0])[0]
         tmp = l_s[indd]
-        b, c = np.unique(tmp, return_counts = True)
+        b, c = np.unique(tmp, return_counts=True)
 
         topVol_tmp[indd, :, :] = topVol[b, :, :].repeat(c, 0)
-        b, c = np.unique(l_s, return_counts = True)
+        b, c = np.unique(l_s, return_counts=True)
         bottomVol_tmp[:] = bottomVol[b, :, :].repeat(c, 0)
 
-        #topVol[l_s, :, :].astype(np.float32)[None]
+        # topVol[l_s, :, :].astype(np.float32)[None]
 
         a, b, c = fusion_perslice(
             topVol_tmp[None],
@@ -2211,6 +2399,7 @@ def fusionResult(
         return recon, reconVol_separate
     else:
         return recon
+
 
 def fusionResultFour(
     boundaryTop,
@@ -2461,7 +2650,7 @@ def volumeTranslate_compose(
     device,
     xy_spacing,
     z_spacing,
-    high_res = False,
+    high_res=False,
 ):
     zs, ze, zss, zee = translatingParams(int(round(AffineMapZXY[0])))
     xs, xe, xss, xee = translatingParams(int(round(AffineMapZXY[1])))
@@ -2501,25 +2690,36 @@ def volumeTranslate_compose(
         flip_z = False
 
     if zmax > s:
-        z_list = np.concatenate((np.ones(zmax - s, dtype = np.int32)*-1, z_list))
+        z_list = np.concatenate((np.ones(zmax - s, dtype=np.int32) * -1, z_list))
 
     if AffineMapZXY[0] < 0:
-        z_list = np.concatenate((z_list, np.ones(int(np.ceil(-AffineMapZXY[0])), dtype = np.int32)*-1))
+        z_list = np.concatenate(
+            (z_list, np.ones(int(np.ceil(-AffineMapZXY[0])), dtype=np.int32) * -1)
+        )
 
     if np.ceil(padding_z) > len(z_list):
-        z_list = np.concatenate((z_list, np.ones(int(np.ceil(padding_z)-len(z_list)), dtype = np.int32)*-1))
+        z_list = np.concatenate(
+            (
+                z_list,
+                np.ones(int(np.ceil(padding_z) - len(z_list)), dtype=np.int32) * -1,
+            )
+        )
 
-    tmp = np.ones_like(z_list)*-1
+    tmp = np.ones_like(z_list) * -1
     tmp[zss:zee] = z_list[zs:ze]
     z_list = copy.deepcopy(tmp)
     del tmp
 
-    commonData = np.zeros((len(z_list),
-                           m if not T_flag else n,
-                           n if not T_flag else m), dtype=inputs_dtype)
+    commonData = np.zeros(
+        (len(z_list), m if not T_flag else n, n if not T_flag else m),
+        dtype=inputs_dtype,
+    )
 
-    yy, xx = torch.meshgrid(torch.arange(commonData.shape[2]).to(torch.float).to(device) * xy_spacing,
-                            torch.arange(commonData.shape[1]).to(torch.float).to(device) * xy_spacing, indexing = "ij")
+    yy, xx = torch.meshgrid(
+        torch.arange(commonData.shape[2]).to(torch.float).to(device) * xy_spacing,
+        torch.arange(commonData.shape[1]).to(torch.float).to(device) * xy_spacing,
+        indexing="ij",
+    )
     xx, yy = xx.T[None], yy.T[None]
     ss = torch.split(torch.arange(commonData.shape[0]), 10)
 
@@ -2529,7 +2729,7 @@ def volumeTranslate_compose(
         Z = (
             z_spacing
             * torch.ones_like(xx)
-            * torch.arange(start, end, dtype=torch.float, device = device)[:, None, None]
+            * torch.arange(start, end, dtype=torch.float, device=device)[:, None, None]
         )
         X = xx.repeat(end - start, 1, 1)
         Y = yy.repeat(end - start, 1, 1)
@@ -2542,7 +2742,9 @@ def volumeTranslate_compose(
             coor_translated = copy.deepcopy(coor.reshape(4, -1))
         if T2 is not None:
             coor_translated = torch.matmul(T2, coor_translated)
-        norm = torch.from_numpy(np.array([z_spacing, xy_spacing, xy_spacing, 1]).astype(np.float32)).to(device)[:, None]
+        norm = torch.from_numpy(
+            np.array([z_spacing, xy_spacing, xy_spacing, 1]).astype(np.float32)
+        ).to(device)[:, None]
         coor_translated /= norm
 
         coor_translated = coor_translated[:-1].reshape(
@@ -2554,7 +2756,9 @@ def volumeTranslate_compose(
         if coor_translated[0, ...].min() >= len(z_list):
             continue
         minn = int(torch.clip(torch.floor(coor_translated[0, ...].min()), 0, None))
-        maxx = int(torch.clip(torch.ceil(coor_translated[0, ...].max()), None, len(z_list)))
+        maxx = int(
+            torch.clip(torch.ceil(coor_translated[0, ...].max()), None, len(z_list))
+        )
 
         z_list_small = z_list[minn : maxx + 1]
         smallData = np.zeros((len(z_list_small), m, n), dtype=inputs_dtype)
@@ -2574,7 +2778,11 @@ def volumeTranslate_compose(
         del smallData
         if smallData_translate.shape[0] == 1:
             smallData_translate = np.concatenate(
-                (smallData_translate, np.zeros((1, m, n), dtype=smallData_translate.dtype)), 0
+                (
+                    smallData_translate,
+                    np.zeros((1, m, n), dtype=smallData_translate.dtype),
+                ),
+                0,
             )
 
         coor_translated[0, ...] = coor_translated[0, ...] - minn
@@ -2673,7 +2881,9 @@ def fineReg(
         moving_view_uint16_pad.shape, dtype=np.uint16
     )
     moving_view_uint16_translated[zss:zee, xss:xee, yss:yee] = moving_view_uint16_pad[
-        zs:ze, xs:xe, ys:ye,
+        zs:ze,
+        xs:xe,
+        ys:ye,
     ]
     del moving_view_uint16_pad
     respective_view_cropped = respective_view_uint16_pad[:, xcs:xce, ycs:yce]
@@ -2684,28 +2894,58 @@ def fineReg(
     respective_view_uint8[:] = respective_view_cropped / InfoMax * 255
     moving_view_uint8[:] = moving_view_cropped / InfoMax * 255
 
-    size = sys.getsizeof(respective_view_uint8)/registration_params["axial_upsample"]/(registration_params["lateral_upsample"])**2
-    if size<209715344:
+    size = (
+        sys.getsizeof(respective_view_uint8)
+        / registration_params["axial_upsample"]
+        / (registration_params["lateral_upsample"]) ** 2
+    )
+    if size < 209715344:
         s = 0
         e = None
     else:
-        r = 209715344 // sys.getsizeof(np.ones(int(moving_view_uint8[0].size/(registration_params["lateral_upsample"])**2), dtype = np.uint8))
-        s = (moving_view_uint8.shape[0] - r)//2
+        r = 209715344 // sys.getsizeof(
+            np.ones(
+                int(
+                    moving_view_uint8[0].size
+                    / (registration_params["lateral_upsample"]) ** 2
+                ),
+                dtype=np.uint8,
+            )
+        )
+        s = (moving_view_uint8.shape[0] - r) // 2
         e = -s
         print("only [{}, {}] slices will be used for registration...".format(s, e))
 
     del moving_view_cropped, respective_view_cropped
     print("to ANTS...")
     staticANTS = ants.from_numpy(
-        respective_view_uint8[s:e:registration_params["axial_upsample"],
-                              ::registration_params["lateral_upsample"],
-                              ::registration_params["lateral_upsample"]]
+        respective_view_uint8[
+            s : e : registration_params["axial_upsample"],
+            :: registration_params["lateral_upsample"],
+            :: registration_params["lateral_upsample"],
+        ]
     )
-    movingANTS = ants.from_numpy(moving_view_uint8[s:e:registration_params["axial_upsample"],
-                                                   ::registration_params["lateral_upsample"],
-                                                   ::registration_params["lateral_upsample"]])
-    movingANTS.set_spacing((z_spacing * registration_params["axial_upsample"], xy_spacing * registration_params["lateral_upsample"], xy_spacing * registration_params["lateral_upsample"]))
-    staticANTS.set_spacing((z_spacing * registration_params["axial_upsample"], xy_spacing * registration_params["lateral_upsample"], xy_spacing * registration_params["lateral_upsample"]))
+    movingANTS = ants.from_numpy(
+        moving_view_uint8[
+            s : e : registration_params["axial_upsample"],
+            :: registration_params["lateral_upsample"],
+            :: registration_params["lateral_upsample"],
+        ]
+    )
+    movingANTS.set_spacing(
+        (
+            z_spacing * registration_params["axial_upsample"],
+            xy_spacing * registration_params["lateral_upsample"],
+            xy_spacing * registration_params["lateral_upsample"],
+        )
+    )
+    staticANTS.set_spacing(
+        (
+            z_spacing * registration_params["axial_upsample"],
+            xy_spacing * registration_params["lateral_upsample"],
+            xy_spacing * registration_params["lateral_upsample"],
+        )
+    )
     del moving_view_uint8, respective_view_uint8
     print("registration...")
     regModel = ants.registration(
