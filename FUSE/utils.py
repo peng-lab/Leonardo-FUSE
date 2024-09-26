@@ -336,7 +336,7 @@ def EM2DPlus(
             .to(device)
         )
         if _xy == True:
-            tmp = min_boundary.cpu().data.numpy()
+            tmp = copy.deepcopy(min_boundary.cpu().data.numpy())
             tmp[tmp != m1 * 2] = 0
             _, ind = scipy.ndimage.distance_transform_edt(
                 tmp, return_distances=True, return_indices=True, sampling=[1, 1e3]
@@ -344,7 +344,7 @@ def EM2DPlus(
             min_boundary[min_boundary == m1 * 2] = min_boundary[ind[0], ind[1]][
                 min_boundary == m1 * 2
             ]
-            tmp = max_boundary.cpu().data.numpy()
+            tmp = copy.deepcopy(max_boundary.cpu().data.numpy())
             tmp[tmp != -m1 * 2] = 0
             _, ind = scipy.ndimage.distance_transform_edt(
                 tmp, return_distances=True, return_indices=True, sampling=[1, 1e3]

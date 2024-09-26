@@ -39,8 +39,8 @@ dev_requirements = [
 
 requirements = [
     "scikit-image",
-    "torch",
-    "torchvision",
+    "torch==2.0.0",
+    "torchvision==0.15.1",
     "tqdm",
     "aicsimageio",
     "antspyx",
