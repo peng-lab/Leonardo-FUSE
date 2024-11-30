@@ -396,12 +396,12 @@ class FUSE_det:
                                 ),
                                 dtype=ventral_det_data_array.dtype,
                             )
-                            ventral_det_data_lr[r] = (
-                                tmp.cpu()
-                                .data.numpy()
-                                .squeeze()
-                                .astype(ventral_det_data_lr.dtype)
-                            )
+                        ventral_det_data_lr[r] = (
+                            tmp.cpu()
+                            .data.numpy()
+                            .squeeze()
+                            .astype(ventral_det_data_lr.dtype)
+                        )
                     for r, i in enumerate(
                         tqdm.tqdm(
                             range(
@@ -434,12 +434,12 @@ class FUSE_det:
                                 ),
                                 dtype=dorsal_det_data_array.dtype,
                             )
-                            dorsal_det_data_lr[r] = (
-                                tmp.cpu()
-                                .data.numpy()
-                                .squeeze()
-                                .astype(dorsal_det_data_lr.dtype)
-                            )
+                        dorsal_det_data_lr[r] = (
+                            tmp.cpu()
+                            .data.numpy()
+                            .squeeze()
+                            .astype(dorsal_det_data_lr.dtype)
+                        )
                     ventral_det_data_handle.close()
                     dorsal_det_data_handle.close()
                     self.train_down_sample(
