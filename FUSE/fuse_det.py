@@ -329,7 +329,7 @@ class FUSE_det:
         display: bool = True,
     ):
         if (xy_downsample_ratio == None) or (xy_downsample_ratio == None):
-            self.train_down_sample(
+            result = self.train_down_sample(
                 require_registration,
                 require_flipping_along_illu_for_dorsaldet,
                 require_flipping_along_det_for_dorsaldet,
@@ -445,7 +445,7 @@ class FUSE_det:
                         )
                     ventral_det_data_handle.close()
                     dorsal_det_data_handle.close()
-                    self.train_down_sample(
+                    result = self.train_down_sample(
                         require_registration,
                         require_flipping_along_illu_for_dorsaldet,
                         require_flipping_along_det_for_dorsaldet,
@@ -509,6 +509,7 @@ class FUSE_det:
                     "downsampled fusion only works for detection-side fusion with two inputs now."
                 )
                 return
+        return result
 
     def train_down_sample(
         self,
