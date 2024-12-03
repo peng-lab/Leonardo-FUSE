@@ -292,6 +292,7 @@ class FUSE_det:
             z_spacing=z_spacing,
             xy_spacing=xy_spacing,
             left_right=left_right,
+            display=False,
             # TODO: more parameters?
         )
         if not params["keep_intermediates"]:
@@ -325,6 +326,7 @@ class FUSE_det:
         left_right: bool = None,
         xy_downsample_ratio: int = None,
         z_downsample_ratio: int = None,
+        display: bool = True,
     ):
         if (xy_downsample_ratio == None) or (xy_downsample_ratio == None):
             self.train_down_sample(
@@ -350,6 +352,7 @@ class FUSE_det:
                 z_spacing,
                 xy_spacing,
                 left_right,
+                display,
             )
         else:
             if (ventral_det_data is not None) and ((dorsal_det_data is not None)):
@@ -465,6 +468,7 @@ class FUSE_det:
                         z_spacing,
                         xy_spacing,
                         left_right,
+                        display,
                     )
 
                     self.apply(
@@ -530,6 +534,7 @@ class FUSE_det:
         z_spacing: float = None,  # axial
         xy_spacing: float = None,  # lateral
         left_right: bool = None,
+        display: bool = True,
     ):
         if require_registration:
             if (z_spacing == None) or (xy_spacing == None):
@@ -725,6 +730,7 @@ class FUSE_det:
                 save_separate_results=save_separate_results,
                 sparse_sample=sparse_sample,
                 camera_position="ventral_det",
+                display=display,
             )
         if illu_flag_dorsal:
             print("\nFusion along illumination for dorsal camera...")
@@ -745,6 +751,7 @@ class FUSE_det:
                     else "front"
                 ),
                 camera_position="dorsal_det",
+                display=display,
             )
 
         data_path = os.path.join(data_path, sample_name)
@@ -1360,35 +1367,35 @@ class FUSE_det:
                     xs, xe, ys, ye = self.train_params["precropping_params"]
         else:
             xs, xe, ys, ye = None, None, None, None
-
-        fig, (ax1, ax2) = plt.subplots(1, 2, dpi=200)
-        ax1.imshow(illu_front.max(0).T if T_flag else illu_front.max(0))
-        if self.train_params["require_precropping"]:
-            rect = patches.Rectangle(
-                (ys, xs) if (not T_flag) else (xs, ys),
-                (ye - ys) if (not T_flag) else (xe - xs),
-                (xe - xs) if (not T_flag) else (ye - ys),
-                linewidth=1,
-                edgecolor="r",
-                facecolor="none",
-            )
-            ax1.add_patch(rect)
-        ax1.set_title("ventral det", fontsize=8, pad=1)
-        ax1.axis("off")
-        ax2.imshow(illu_back.max(0).T if T_flag else illu_back.max(0))
-        if self.train_params["require_precropping"]:
-            rect = patches.Rectangle(
-                (ys, xs) if (not T_flag) else (xs, ys),
-                (ye - ys) if (not T_flag) else (xe - xs),
-                (xe - xs) if (not T_flag) else (ye - ys),
-                linewidth=1,
-                edgecolor="r",
-                facecolor="none",
-            )
-            ax2.add_patch(rect)
-        ax2.set_title("dorsal det", fontsize=8, pad=1)
-        ax2.axis("off")
-        plt.show()
+        if display:
+            fig, (ax1, ax2) = plt.subplots(1, 2, dpi=200)
+            ax1.imshow(illu_front.max(0).T if T_flag else illu_front.max(0))
+            if self.train_params["require_precropping"]:
+                rect = patches.Rectangle(
+                    (ys, xs) if (not T_flag) else (xs, ys),
+                    (ye - ys) if (not T_flag) else (xe - xs),
+                    (xe - xs) if (not T_flag) else (ye - ys),
+                    linewidth=1,
+                    edgecolor="r",
+                    facecolor="none",
+                )
+                ax1.add_patch(rect)
+            ax1.set_title("ventral det", fontsize=8, pad=1)
+            ax1.axis("off")
+            ax2.imshow(illu_back.max(0).T if T_flag else illu_back.max(0))
+            if self.train_params["require_precropping"]:
+                rect = patches.Rectangle(
+                    (ys, xs) if (not T_flag) else (xs, ys),
+                    (ye - ys) if (not T_flag) else (xe - xs),
+                    (xe - xs) if (not T_flag) else (ye - ys),
+                    linewidth=1,
+                    edgecolor="r",
+                    facecolor="none",
+                )
+                ax2.add_patch(rect)
+            ax2.set_title("dorsal det", fontsize=8, pad=1)
+            ax2.axis("off")
+            plt.show()
 
         if self.train_params["require_segmentation"]:
             segMask = self.segmentSample(
@@ -2062,17 +2069,18 @@ class FUSE_det:
         del reconVol
         if save_separate_results:
             del reconVol_separate
-        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, dpi=200)
-        ax1.imshow(result.max(0))
-        ax1.set_title("result in xy", fontsize=8, pad=1)
-        ax1.axis("off")
-        ax2.imshow(result.max(1))
-        ax2.set_title("result in zy", fontsize=8, pad=1)
-        ax2.axis("off")
-        ax3.imshow(result.max(2))
-        ax3.set_title("result in zx", fontsize=8, pad=1)
-        ax3.axis("off")
-        plt.show()
+        if display:
+            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, dpi=200)
+            ax1.imshow(result.max(0))
+            ax1.set_title("result in xy", fontsize=8, pad=1)
+            ax1.axis("off")
+            ax2.imshow(result.max(1))
+            ax2.set_title("result in zy", fontsize=8, pad=1)
+            ax2.axis("off")
+            ax3.imshow(result.max(2))
+            ax3.set_title("result in zx", fontsize=8, pad=1)
+            ax3.axis("off")
+            plt.show()
         print("Save...")
 
         tifffile.imwrite(

@@ -1,5 +1,7 @@
 from datetime import datetime
 import shutil
+
+
 def make_Ramp(ramp_colors):
     from colour import Color
     from matplotlib.colors import LinearSegmentedColormap
@@ -134,7 +136,9 @@ class FUSE_illu:
             left_illu_data = image2
             right_illu_data = image1
         else:
-            raise ValueError(f"Invalid combination of directions: {direction1}, {direction2}")
+            raise ValueError(
+                f"Invalid combination of directions: {direction1}, {direction2}"
+            )
         tmp_path = params["tmp_path"]
         # Create a directory under the intermediate_path
         current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -148,6 +152,7 @@ class FUSE_illu:
             left_illu_data=left_illu_data,
             right_illu_data=right_illu_data,
             save_path=new_dir_path,
+            display=False,
             # TODO: more parameters?
         )
         if not params["keep_intermediates"]:
@@ -169,6 +174,7 @@ class FUSE_illu:
         sparse_sample=False,
         cam_pos: str = "front",
         camera_position: str = "",
+        display: bool = True,
     ):
         data_path = os.path.join(data_path, sample_name)
         if not os.path.exists(save_path):
@@ -295,47 +301,49 @@ class FUSE_illu:
             xs, xe, ys, ye = None, None, None, None
 
         s_o, m_o, n_o = rawPlanes_top.shape
-
-        fig, (ax1, ax2) = plt.subplots(1, 2, dpi=200)
-        MIP_top = rawPlanes_top.max(0)
-        if T_flag:
-            MIP_top = MIP_top.T
-        MIP_bottom = rawPlanes_bottom.max(0)
-        if self.train_params["require_precropping"]:
-            top_left_point = [ys, xs]
+        if display:
+            fig, (ax1, ax2) = plt.subplots(1, 2, dpi=200)
+            MIP_top = rawPlanes_top.max(0)
             if T_flag:
-                top_left_point = [top_left_point[1], top_left_point[0]]
-        if T_flag:
-            MIP_bottom = MIP_bottom.T
-        ax1.imshow(MIP_top)
-        if self.train_params["require_precropping"]:
-            rect = patches.Rectangle(
-                tuple(top_left_point),
-                (ye - ys) if (not T_flag) else (xe - xs),
-                (xe - xs) if (not T_flag) else (ye - ys),
-                linewidth=1,
-                edgecolor="r",
-                facecolor="none",
+                MIP_top = MIP_top.T
+            MIP_bottom = rawPlanes_bottom.max(0)
+            if self.train_params["require_precropping"]:
+                top_left_point = [ys, xs]
+                if T_flag:
+                    top_left_point = [top_left_point[1], top_left_point[0]]
+            if T_flag:
+                MIP_bottom = MIP_bottom.T
+            ax1.imshow(MIP_top)
+            if self.train_params["require_precropping"]:
+                rect = patches.Rectangle(
+                    tuple(top_left_point),
+                    (ye - ys) if (not T_flag) else (xe - xs),
+                    (xe - xs) if (not T_flag) else (ye - ys),
+                    linewidth=1,
+                    edgecolor="r",
+                    facecolor="none",
+                )
+                ax1.add_patch(rect)
+            ax1.set_title(
+                "{} illu".format("left" if T_flag else "top"), fontsize=8, pad=1
             )
-            ax1.add_patch(rect)
-        ax1.set_title("{} illu".format("left" if T_flag else "top"), fontsize=8, pad=1)
-        ax1.axis("off")
-        ax2.imshow(MIP_bottom)
-        if self.train_params["require_precropping"]:
-            rect = patches.Rectangle(
-                tuple(top_left_point),
-                (ye - ys) if (not T_flag) else (xe - xs),
-                (xe - xs) if (not T_flag) else (ye - ys),
-                linewidth=1,
-                edgecolor="r",
-                facecolor="none",
+            ax1.axis("off")
+            ax2.imshow(MIP_bottom)
+            if self.train_params["require_precropping"]:
+                rect = patches.Rectangle(
+                    tuple(top_left_point),
+                    (ye - ys) if (not T_flag) else (xe - xs),
+                    (xe - xs) if (not T_flag) else (ye - ys),
+                    linewidth=1,
+                    edgecolor="r",
+                    facecolor="none",
+                )
+                ax2.add_patch(rect)
+            ax2.set_title(
+                "{} illu".format("right" if T_flag else "bottom"), fontsize=8, pad=1
             )
-            ax2.add_patch(rect)
-        ax2.set_title(
-            "{} illu".format("right" if T_flag else "bottom"), fontsize=8, pad=1
-        )
-        ax2.axis("off")
-        plt.show()
+            ax2.axis("off")
+            plt.show()
 
         print("\nCalculate volumetric measurements...")
         thvol_top, maxvvol_top, minvvol_top = self.measureSample(
@@ -486,14 +494,15 @@ class FUSE_illu:
             del recon, reconVol_separate
         else:
             del recon
-        fig, (ax1, ax2) = plt.subplots(1, 2, dpi=200)
-        xyMIP = result.max(0)
-        ax1.imshow(xyMIP)
-        ax1.set_title("result", fontsize=8, pad=1)
-        ax1.axis("off")
-        ax2.imshow(np.zeros_like(xyMIP))
-        ax2.axis("off")
-        plt.show()
+        if display:
+            fig, (ax1, ax2) = plt.subplots(1, 2, dpi=200)
+            xyMIP = result.max(0)
+            ax1.imshow(xyMIP)
+            ax1.set_title("result", fontsize=8, pad=1)
+            ax1.axis("off")
+            ax2.imshow(np.zeros_like(xyMIP))
+            ax2.axis("off")
+            plt.show()
         if cam_pos == "back":
             result = result[::-1, :, :]
             if save_separate_results:
