@@ -22,7 +22,7 @@ jobs:
         pip install .[test] --verbose
     - name: Test with pytest
       run: |
-        pytest FUSE/tests/
+        pytest -v FUSE/tests/
     - name: Upload codecov
       uses: codecov/codecov-action@v1
 
