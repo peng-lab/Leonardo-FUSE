@@ -30,7 +30,7 @@ jobs:
         pip install .[test] --verbose
     - name: Test with pytest
       run: |
-        pytest --cov-report xml --cov=lsfm_destripe lsfm_destripe/tests/
+        pytest --cov-report xml --cov=FUSE FUSE/tests/
     - name: Upload codecov
       uses: codecov/codecov-action@v1
 
@@ -49,10 +49,10 @@ jobs:
         pip install .[test] --verbose
     - name: Lint with flake8
       run: |
-        flake8 lsfm_destripe --count --verbose --show-source --statistics
+        flake8 FUSE --count --verbose --show-source --statistics
     - name: Check with black
       run: |
-        black --check lsfm_destripe
+        black --check FUSE
 
   publish:
     if: "contains(github.event.head_commit.message, 'Bump version')"
