@@ -13,5 +13,5 @@ def get_module_version():
     return __version__
 
 
-from .fuse_illu import FUSE_illu   # noqa: F401
+from .fuse_illu import FUSE_illu  # noqa: F401
 from .fuse_det import FUSE_det  # noqa: F401
