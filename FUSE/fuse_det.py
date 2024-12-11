@@ -37,26 +37,23 @@ green = green.astype(np.uint8).T
 from FUSE.fuse_illu import FUSE_illu
 from FUSE.blobs_dog import blob_dog
 from FUSE.utils import (
-    GuidedFilter,
     sgolay2dkernel,
     waterShed,
     refineShape,
-    extendBoundary,
     EM2DPlus,
     fusion_perslice,
     extendBoundary2,
     imagej_metadata_tags,
 )
 from skimage import measure
-from FUSE.NSCT import NSCTdec, NSCTrec
+from FUSE.NSCT import NSCTdec
 
 # from FUSE.blobs_dog import blob_dog
-from typing import Union, Tuple, Optional, List, Dict
+from typing import Union
 import dask
 import torch
 import os
 from aicsimageio import AICSImage
-import scipy.ndimage as ndimage
 import ants
 import scipy.io as scipyio
 import open3d as o3d
@@ -67,7 +64,6 @@ except ImportError:
     from skimage import filter as filters
 from skimage import morphology
 import shutil
-import io
 import copy
 import SimpleITK as sitk
 import tqdm
@@ -78,7 +74,6 @@ import dask.array as da
 
 pd.set_option("display.width", 10000)
 import matplotlib.patches as patches
-import torch.nn as nn
 import torch.nn.functional as F
 import tifffile
 import sys
@@ -133,7 +128,7 @@ class FUSE_det:
         device: str = None,
         registration_params=None,
     ):
-        if device == None:
+        if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.train_params = {
             "require_precropping": require_precropping,
@@ -218,7 +213,8 @@ class FUSE_det:
                 right_ventral_data = image1
             else:
                 raise ValueError(
-                    f"Invalid directions for ventral detection: {direction1}, {direction2}"
+                    f"Invalid directions for ventral detection: {direction1}, "
+                    f"{direction2}"
                 )
 
             if (
@@ -227,7 +223,8 @@ class FUSE_det:
                 or direction3 == direction4
             ):
                 raise ValueError(
-                    f"Invalid directions for dorsal detection: {direction3}, {direction4}"
+                    f"Invalid directions for dorsal detection: {direction3}, "
+                    f"{direction4}"
                 )
 
             if direction3 == "Top" and direction4 == "Bottom":
@@ -328,7 +325,7 @@ class FUSE_det:
         z_downsample_ratio: int = None,
         display: bool = True,
     ):
-        if (xy_downsample_ratio == None) or (xy_downsample_ratio == None):
+        if (xy_downsample_ratio is None) or (xy_downsample_ratio is None):
             result = self.train_down_sample(
                 require_registration,
                 require_flipping_along_illu_for_dorsaldet,
@@ -506,7 +503,8 @@ class FUSE_det:
                     return
             else:
                 print(
-                    "downsampled fusion only works for detection-side fusion with two inputs now."
+                    "downsampled fusion only works for detection-side fusion with "
+                    "two inputs now."
                 )
                 return
         return result
@@ -538,7 +536,7 @@ class FUSE_det:
         display: bool = True,
     ):
         if require_registration:
-            if (z_spacing == None) or (xy_spacing == None):
+            if (z_spacing is None) or (xy_spacing is None):
                 print("spacing information is missing.")
                 return
         illu_name = "illuFusionResult{}{}".format(
@@ -565,8 +563,12 @@ class FUSE_det:
 
         self.sample_params = {
             "require_registration": require_registration,
-            "require_flipping_along_det_for_dorsaldet": require_flipping_along_det_for_dorsaldet,
-            "require_flipping_along_illu_for_dorsaldet": require_flipping_along_illu_for_dorsaldet,
+            "require_flipping_along_det_for_dorsaldet": (
+                require_flipping_along_det_for_dorsaldet
+            ),
+            "require_flipping_along_illu_for_dorsaldet": (
+                require_flipping_along_illu_for_dorsaldet
+            ),
             "z_spacing": z_spacing,
             "xy_spacing": xy_spacing,
         }
@@ -652,10 +654,10 @@ class FUSE_det:
                     "right_illu+dorsal_det"
                 )
         elif (ventral_det_data is not None) and ((dorsal_det_data is not None)):
-            if left_right == None:
+            if left_right is None:
                 print("left-right marker is missing.")
                 return
-            if left_right == True:
+            if left_right is True:
                 T_flag = 1
             else:
                 T_flag = 0
@@ -748,7 +750,7 @@ class FUSE_det:
                 sparse_sample=sparse_sample,
                 cam_pos=(
                     "back"
-                    if require_flipping_along_det_for_dorsaldet == False
+                    if require_flipping_along_det_for_dorsaldet is False
                     else "front"
                 ),
                 camera_position="dorsal_det",
@@ -766,7 +768,7 @@ class FUSE_det:
                     )
                     + "/regInfo.npy"
                 )
-            ) or (self.registration_params["skip_registration"] == False):
+            ) or (self.registration_params["skip_registration"] is False):
                 print("\nRegister...")
                 print("read in...")
 
@@ -990,7 +992,7 @@ class FUSE_det:
                         "regInfo_refine.npy",
                     )
                 )
-            ) or (self.registration_params["skip_transformation"] == False):
+            ) or (self.registration_params["skip_transformation"] is False):
                 print("refine registration...")
 
                 if not det_only_flag:
@@ -2148,7 +2150,7 @@ class FUSE_det:
             os.makedirs(os.path.join(save_path, "high_res"))
 
         if require_registration:
-            if (z_spacing == None) or (xy_spacing == None):
+            if (z_spacing is None) or (xy_spacing is None):
                 print("spacing information is missing.")
                 return
 
@@ -2427,9 +2429,11 @@ class FUSE_det:
             ).to(device), torch.from_numpy(bottomDataFloat[:, None, :, :]).to(device)
             # topDataGPU[:], bottomDataGPU[:] = topDataGPU / Max, bottomDataGPU / Max
             a, b, c = featureExtrac.nsctDec(topDataGPU, r, _forFeatures=True)
-            max_filter = nn.MaxPool2d(
-                (59, 59), stride=(1, 1), padding=(59 // 2, 59 // 2)
-            )
+
+            # TODO: check the code below, if no need any more, remove it
+            # max_filter = nn.MaxPool2d(
+            #     (59, 59), stride=(1, 1), padding=(59 // 2, 59 // 2)
+            # )
             # c = max_filter(c[None])[0]
             topF[p:q], topFBase[p:q] = (
                 c.cpu().detach().numpy(),
@@ -2542,9 +2546,9 @@ class FUSE_det:
                 ]
                 th = 0
                 maxv = 0
-                for l in allList:
+                for ll in allList:
                     t = np.load(
-                        os.path.join(info_path, l, "info.npy"), allow_pickle=True
+                        os.path.join(info_path, ll, "info.npy"), allow_pickle=True
                     ).item()
                     th += t["MIP_th"]
                     maxv = max(maxv, t["MIP_max"])
@@ -2582,12 +2586,13 @@ class FUSE_det:
         th=None,
     ):
         m, n = maximumProjection.shape
-        if th == None:
-            maxv, minv, th = (
-                maximumProjection.max(),
-                maximumProjection.min(),
-                filters.threshold_otsu(maximumProjection),
-            )
+        if th is None:
+            th = filters.threshold_otsu(maximumProjection)
+            # maxv, minv, th = (
+            #     maximumProjection.max(),
+            #     maximumProjection.min(),
+            #     filters.threshold_otsu(maximumProjection),
+            # )
         thresh = maximumProjection > th
         segMask = morphology.remove_small_objects(thresh, min_size=25)
         d1, d2 = (
@@ -2619,7 +2624,7 @@ def fusionResult(
     GFr[1] = GFr[1] // 4 * 2 + 1
     boundary = mask > boundary
 
-    l = np.concatenate(
+    l_temp = np.concatenate(
         (
             np.zeros(GFr[0] // 2, dtype=np.int32),
             np.arange(s),
@@ -2630,9 +2635,9 @@ def fusionResult(
     recon = np.zeros(bottomVol.shape, dtype=np.uint16)
 
     for ii in tqdm.tqdm(
-        range(GFr[0] // 2, len(l) - GFr[0] // 2), desc="fusion: "
+        range(GFr[0] // 2, len(l_temp) - GFr[0] // 2), desc="fusion: "
     ):  # topVol.shape[0]
-        l_s = l[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
+        l_s = l_temp[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
 
         bottomMask = torch.from_numpy(boundary[:, l_s, :, :]).to(device).to(torch.float)
         topMask = torch.from_numpy((~boundary[:, l_s, :, :])).to(device).to(torch.float)
@@ -2704,17 +2709,17 @@ def fusionResultFour(
             ),
             0,
         )
-    mask_front = mask > boundaryFront[:, None, :]  ###1是下面，0是上面
+    mask_front = mask > boundaryFront[:, None, :]  # 1是下面，0是上面
     if boundaryBack.ndim == 2:
         mask_back = mask > boundaryBack[:, None, :]
     else:
         mask_back = boundaryBack
     mask_ztop = (
         np.arange(s)[:, None, None] > boundaryTop[None, :, :]
-    )  ###1是后面，0是前面
+    )  # 1是后面，0是前面
     mask_zbottom = (
         np.arange(s)[:, None, None] > boundaryBottom[None, :, :]
-    )  ###1是后面，0是前面
+    )  # 1是后面，0是前面
 
     listPair1 = {"1": "4", "2": "3", "4": "1", "3": "2"}
     reconVol = np.empty(illu_back.shape, dtype=np.uint16)
@@ -2731,9 +2736,9 @@ def fusionResultFour(
     boundary_mask = np.zeros((s, m, n), dtype=bool)
     volmin = 65535
 
-    for l in allList:
+    for ll in allList:
         volmin = min(
-            np.load(os.path.join(info_path, l, "info.npy"), allow_pickle=True).item()[
+            np.load(os.path.join(info_path, ll, "info.npy"), allow_pickle=True).item()[
                 "minvol"
             ],
             volmin,
@@ -2762,10 +2767,10 @@ def fusionResultFour(
 
         List = np.zeros((5, 1, m, n), dtype=np.float32)
 
-        tmp1 = (mask_front[ii] == 0) * (mask_ztop[ii] == 0)  ###top+front
-        tmp2 = (mask_front[ii] == 1) * (mask_zbottom[ii] == 0)  ###bottom+front
-        tmp3 = (mask_back[ii] == 0) * (mask_ztop[ii] == 1)  ###top+back
-        tmp4 = (mask_back[ii] == 1) * (mask_zbottom[ii] == 1)  ###bottom+back
+        tmp1 = (mask_front[ii] == 0) * (mask_ztop[ii] == 0)  # top+front
+        tmp2 = (mask_front[ii] == 1) * (mask_zbottom[ii] == 0)  # bottom+front
+        tmp3 = (mask_back[ii] == 0) * (mask_ztop[ii] == 1)  # top+back
+        tmp4 = (mask_back[ii] == 1) * (mask_zbottom[ii] == 1)  # bottom+back
 
         vnameList = ["1", "2", "3", "4"]
 
@@ -2860,7 +2865,7 @@ def fusionResultFour(
     if s_f < s_b:
         illu_front = np.concatenate((illu_front, illu_back[-(s_b - s_f) :, :, :]), 0)
 
-    l = np.concatenate(
+    l_temp = np.concatenate(
         (
             np.arange(GFr[0] // 2, 0, -1),
             np.arange(s),
@@ -2869,8 +2874,8 @@ def fusionResultFour(
         0,
     )
 
-    for ii in tqdm.tqdm(range(2, len(l) - 2), desc="fusion: "):  # topVol.shape[0]
-        l_s = l[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
+    for ii in tqdm.tqdm(range(2, len(l_temp) - 2), desc="fusion: "):  # topVol.shape[0]
+        l_s = l_temp[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
 
         bottomMask = 1 - boundary_mask[None, l_s, :, :]
         topMask = boundary_mask[None, l_s, :, :]

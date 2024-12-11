@@ -1,7 +1,5 @@
 import torch.nn as nn
 import torch
-import scipy.io as scipyio
-import os
 import math
 import numpy as np
 import copy
@@ -77,7 +75,9 @@ class NSCTdec:
         return y1, y2
 
     def resampz(self, x, sampleType):
-        shift, sx = 1, x.shape
+        sx = x.shape
+        # TODO: check the code below
+        # shift, sx = 1, x.shape
         if (sampleType == 1) or (sampleType == 2):
             y = np.zeros((sx[0] + sx[1] - 1, sx[1]))
             shift1 = (
@@ -187,15 +187,15 @@ class NSCTdec:
             y = torch.cat(
                 (self.nssfbdec(x1, k1, k2, q1), self.nssfbdec(x2, k1, k2, q1)), 1
             )
-            for l in range(3, clevels + 1):
+            for ll in range(3, clevels + 1):
                 y_old = y
                 y = torch.zeros(
-                    x.size()[0], 2**l, y_old.size()[2], y_old.size()[3]
+                    x.size()[0], 2**ll, y_old.size()[2], y_old.size()[3]
                 ).to(self.device)
-                for k in range(1, 2 ** (l - 2) + 1):
-                    slk = 2 * math.floor((k - 1) / 2) - 2 ** (l - 3) + 1
+                for k in range(1, 2 ** (ll - 2) + 1):
+                    slk = 2 * math.floor((k - 1) / 2) - 2 ** (ll - 3) + 1
                     mkl = 2 * np.matmul(
-                        np.array([[2 ** (l - 3), 0], [0, 1]]),
+                        np.array([[2 ** (ll - 3), 0], [0, 1]]),
                         np.array([[1, 0], [-slk, 1]]),
                     )
                     i = (k - 1) % 2 + 1
@@ -205,10 +205,12 @@ class NSCTdec:
                         f2["{}".format(i - 1)],
                         mkl,
                     )
-                for k in range(2 ** (l - 2) + 1, 2 ** (l - 1) + 1):
-                    slk = 2 * math.floor((k - 2 ** (l - 2) - 1) / 2) - 2 ** (l - 3) + 1
+                for k in range(2 ** (ll - 2) + 1, 2 ** (ll - 1) + 1):
+                    slk = (
+                        2 * math.floor((k - 2 ** (ll - 2) - 1) / 2) - 2 ** (ll - 3) + 1
+                    )
                     mkl = 2 * np.matmul(
-                        np.array([[1, 0], [0, 2 ** (l - 3)]]),
+                        np.array([[1, 0], [0, 2 ** (ll - 3)]]),
                         np.array([[1, -slk], [0, 1]]),
                     )
                     i = (k - 1) % 2 + 3
@@ -272,7 +274,7 @@ class NSCTdec:
     def extractFeatures(self, x):
         b, _, m, n = x[0].size()
         f = torch.zeros(b, 1, m, n).to(self.device)
-        L = sum([2**l for l in self.levels])
+        L = sum([2**ll for ll in self.levels])
         for d in x:
             f += torch.sum(d.abs(), dim=1, keepdim=True)
         return f / L
@@ -391,11 +393,11 @@ class NSCTrec:
         if clevels == 1:
             y = self.nssfbrec(x[:, 0:1, :, :], x[:, 1:2, :, :], k1, k2)
         else:
-            for l in range(int(clevels), 3 - 1, -1):
-                for k in range(1, 2 ** (l - 2) + 1):
-                    slk = 2 * math.floor((k - 1) / 2) - 2 ** (l - 3) + 1
+            for ll in range(int(clevels), 3 - 1, -1):
+                for k in range(1, 2 ** (ll - 2) + 1):
+                    slk = 2 * math.floor((k - 1) / 2) - 2 ** (ll - 3) + 1
                     mkl = np.matmul(
-                        2 * np.array([[2 ** (l - 3), 0], [0, 1]]),
+                        2 * np.array([[2 ** (ll - 3), 0], [0, 1]]),
                         np.array([[1, 0], [-slk, 1]]),
                     )
                     i = (k - 1) % 2 + 1
@@ -406,10 +408,12 @@ class NSCTrec:
                         f2[str(i - 1)],
                         mkl,
                     )
-                for k in range(2 ** (l - 2) + 1, 2 ** (l - 1) + 1):
-                    slk = 2 * math.floor((k - 2 ** (l - 2) - 1) / 2) - 2 ** (l - 3) + 1
+                for k in range(2 ** (ll - 2) + 1, 2 ** (ll - 1) + 1):
+                    slk = (
+                        2 * math.floor((k - 2 ** (ll - 2) - 1) / 2) - 2 ** (ll - 3) + 1
+                    )
                     mkl = np.matmul(
-                        2 * np.array([[1, 0], [0, 2 ** (l - 3)]]),
+                        2 * np.array([[1, 0], [0, 2 ** (ll - 3)]]),
                         np.array([[1, -slk], [0, 1]]),
                     )
                     i = (k - 1) % 2 + 3
@@ -430,9 +434,7 @@ class NSCTrec:
         return y
 
     def nsfbrec(self, y0, y1, g0, g1, lev):
-        I2 = np.eye(2)
         if lev != 0:
-            shift = -(2 ** (lev - 1)) * np.array([1, 1]) + 2
             L = 2**lev
             x = torch.conv2d(
                 self.symext(
@@ -452,7 +454,6 @@ class NSCTrec:
                 dilation=L,
             )
         else:
-            shift = np.array([1, 1])
             x = torch.conv2d(
                 self.symext(y0, g0.size(-2) // 2, g0.size(-1) // 2), g0
             ) + torch.conv2d(self.symext(y1, g1.size(-2) // 2, g1.size(-1) // 2), g1)
@@ -646,7 +647,7 @@ class NSCTrec:
         return y1, y2
 
     def resampz(self, x, sampleType):
-        shift, sx = 1, x.shape
+        sx = x.shape
         if (sampleType == 1) or (sampleType == 2):
             y = np.zeros((sx[0] + sx[1] - 1, sx[1]))
             shift1 = (

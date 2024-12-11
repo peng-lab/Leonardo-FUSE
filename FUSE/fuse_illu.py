@@ -40,11 +40,10 @@ import pandas as pd
 
 pd.set_option("display.width", 10000)
 import dask.array as da
-from typing import Union, Tuple, Optional, List, Dict
+from typing import Union
 import torch
 import os
 from aicsimageio import AICSImage
-import numpy.ma as ma
 import copy
 from scipy import signal
 import torch.nn.functional as F
@@ -54,19 +53,17 @@ try:
     from skimage import filters
 except ImportError:
     from skimage import filter as filters
-import cv2
 import matplotlib.pyplot as plt
 from skimage import morphology
 import matplotlib.patches as patches
 import tqdm
 import gc
 import tifffile
-from FUSE.NSCT import NSCTdec, NSCTrec
+from FUSE.NSCT import NSCTdec
 from FUSE.utils import (
     sgolay2dkernel,
     waterShed,
     refineShape,
-    extendBoundary,
     EM2DPlus,
     fusion_perslice,
     imagej_metadata_tags,
@@ -86,7 +83,7 @@ class FUSE_illu:
         require_segmentation: bool = True,
         device: str = None,
     ):
-        if device == None:
+        if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.train_params = {
             "require_precropping": require_precropping,
@@ -632,7 +629,7 @@ class FUSE_illu:
         s, m, n = topVol.shape
         topSegMask = np.zeros((s, m, n), dtype=bool)
         bottomSegMask = np.zeros((s, m, n), dtype=bool)
-        l = signal.savgol_filter(
+        l_temp = signal.savgol_filter(
             ((topVol + 0.0 + bottomVol) > (th_top + th_bottom)).sum(1), 11, 1, axis=0
         )
         l_all = signal.savgol_filter(
@@ -641,8 +638,10 @@ class FUSE_illu:
         l_all = scipy.signal.find_peaks(l_all, height=l_all.max() / 10)[0]
         c_all = min(l_all[0] + 1 if len(l_all) > 0 else s // 2, s // 2)
         c = []
-        for i in range(l.shape[1]):
-            peaks, _ = scipy.signal.find_peaks(l[:, i], height=l[:, i].max() / 10)
+        for i in range(l_temp.shape[1]):
+            peaks, _ = scipy.signal.find_peaks(
+                l_temp[:, i], height=l_temp[:, i].max() / 10
+            )
             if len(peaks) > 0:
                 cc = peaks[0] + 1
             else:
@@ -713,7 +712,7 @@ class FUSE_illu:
             n,
             self.train_params["window_size"][1],
             _xy=True,
-            max_seg=c if sparse_sample == False else [-1] * n,
+            max_seg=c if sparse_sample is False else [-1] * n,
         )
         del topSegMask, bottomSegMask, topVol, bottomVol
         return segMask
@@ -729,9 +728,9 @@ class FUSE_illu:
         minvvol = rawPlanes_vectored.min()
         thvol = filters.threshold_otsu(rawPlanes_vectored)
         print(
-            "minimum intensity = {:.1f}, maximum intensity = {:.1f}, OTSU threshold = {:.1f}".format(
-                minvvol, maxvvol, thvol
-            )
+            f"minimum intensity = {minvvol:.1f}, "
+            f"maximum intensity = {maxvvol:.1f}, "
+            f"OTSU threshold = {thvol:.1f}"
         )
         np.save(
             save_path + "/info.npy",
@@ -801,7 +800,7 @@ def fusionResult(
     mask = torch.arange(m, device=device)[None, None, :, None]
     GFr[1] = GFr[1] // 4 * 2 + 1
 
-    l = np.concatenate(
+    l_temp = np.concatenate(
         (
             np.arange(GFr[0] // 2, 0, -1),
             np.arange(s),
@@ -812,9 +811,9 @@ def fusionResult(
     recon = np.zeros(topVol.shape, dtype=np.uint16)
 
     for ii in tqdm.tqdm(
-        range(GFr[0] // 2, len(l) - GFr[0] // 2), desc="fusion: "
+        range(GFr[0] // 2, len(l_temp) - GFr[0] // 2), desc="fusion: "
     ):  # topVol.shape[0]
-        l_s = l[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
+        l_s = l_temp[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
         boundary_slice = boundary[:, l_s, :, :]
 
         bottomMask = (mask > boundary_slice).to(torch.float)

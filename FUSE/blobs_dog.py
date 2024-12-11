@@ -1,46 +1,68 @@
 import numpy as np
+from warnings import warn
 import math
 import torch.nn.functional as F
 import torch
 import torchvision
-from scipy.spatial import KDTree, distance
 from scipy import spatial
 import copy
+
 try:
     from skimage import filters
 except ImportError:
     from skimage import filter as filters
 
-def blob_dog(image, th, min_sigma=1, max_sigma=50, sigma_ratio=1.6, threshold=0.5,
-             overlap=.5, *, threshold_rel=None, exclude_border=True, device = "cuda"):
+
+def blob_dog(
+    image,
+    th,
+    min_sigma=1,
+    max_sigma=50,
+    sigma_ratio=1.6,
+    threshold=0.5,
+    overlap=0.5,
+    *,
+    threshold_rel=None,
+    exclude_border=True,
+    device="cuda",
+):
     image = image.astype(np.float32)
     image = torch.from_numpy(image).to(device)
-    scalar_sigma, min_sigma, max_sigma = _prep_sigmas(image.ndim, min_sigma, max_sigma,)
+    scalar_sigma, min_sigma, max_sigma = _prep_sigmas(
+        image.ndim,
+        min_sigma,
+        max_sigma,
+    )
 
     if sigma_ratio <= 1.0:
-        raise ValueError('sigma_ratio must be > 1.0')
+        raise ValueError("sigma_ratio must be > 1.0")
 
     log_ratio = math.log(sigma_ratio)
-    k = sum(math.log(max_s / min_s) / log_ratio + 1
-            for max_s, min_s in zip(max_sigma, min_sigma))
+    k = sum(
+        math.log(max_s / min_s) / log_ratio + 1
+        for max_s, min_s in zip(max_sigma, min_sigma)
+    )
     k /= len(min_sigma)
     k = int(k)
 
-    ratio_powers = tuple(sigma_ratio ** i for i in range(k + 1))
-    sigma_list = tuple(tuple(s * p for s in min_sigma)
-                       for p in ratio_powers)
+    ratio_powers = tuple(sigma_ratio**i for i in range(k + 1))
+    sigma_list = tuple(tuple(s * p for s in min_sigma) for p in ratio_powers)
 
-    dog_image_cube = torch.empty(image.shape + (k,), dtype=torch.float, device = device)
+    dog_image_cube = torch.empty(image.shape + (k,), dtype=torch.float, device=device)
 
-
-    gaussian_previous = torchvision.transforms.functional.gaussian_blur(image[None, None],
-                                                                        kernel_size = list(2*np.round(4*np.asarray(sigma_list[0])).astype(np.int32)+1),
-                                                                        sigma = list(np.asarray(sigma_list[0]).astype(np.int32)))[0, 0]
+    gaussian_previous = torchvision.transforms.functional.gaussian_blur(
+        image[None, None],
+        kernel_size=list(
+            2 * np.round(4 * np.asarray(sigma_list[0])).astype(np.int32) + 1
+        ),
+        sigma=list(np.asarray(sigma_list[0]).astype(np.int32)),
+    )[0, 0]
     for i, s in enumerate(sigma_list[1:]):
-        gaussian_current = torchvision.transforms.functional.gaussian_blur(image[None, None],
-                                                                            kernel_size = list(2*np.round(4*np.asarray(s)).astype(np.int32)+1),
-                                                                            sigma = list(np.asarray(s).astype(np.int32)))[0, 0]
-
+        gaussian_current = torchvision.transforms.functional.gaussian_blur(
+            image[None, None],
+            kernel_size=list(2 * np.round(4 * np.asarray(s)).astype(np.int32) + 1),
+            sigma=list(np.asarray(s).astype(np.int32)),
+        )[0, 0]
 
         dog_image_cube[..., i] = gaussian_previous - gaussian_current
         gaussian_previous = gaussian_current
@@ -51,7 +73,7 @@ def blob_dog(image, th, min_sigma=1, max_sigma=50, sigma_ratio=1.6, threshold=0.
     exclude_border = _format_exclude_border(image.ndim, exclude_border)
     local_maxima = peak_local_max(
         dog_image_cube,
-        segment=image>th,
+        segment=image > th,
         threshold_abs=threshold,
         threshold_rel=threshold_rel,
         exclude_border=exclude_border,
@@ -61,10 +83,12 @@ def blob_dog(image, th, min_sigma=1, max_sigma=50, sigma_ratio=1.6, threshold=0.
 
     # Catch no peaks
     if local_maxima.numel() == 0:
-        return torch.empty((0, image.ndim + (1 if scalar_sigma else image.ndim))).to(device)
+        return torch.empty((0, image.ndim + (1 if scalar_sigma else image.ndim))).to(
+            device
+        )
 
     # Convert local_maxima to float64
-    lm = copy.deepcopy(local_maxima)#.astype(np.float64)
+    lm = copy.deepcopy(local_maxima)  # .astype(np.float64)
 
     # translate final column of lm, which contains the index of the
     # sigma that produced the maximum intensity value, into the sigma
@@ -80,6 +104,7 @@ def blob_dog(image, th, min_sigma=1, max_sigma=50, sigma_ratio=1.6, threshold=0.
 
     sigma_dim = sigmas_of_peaks.shape[1]
     return _prune_blobs(lm, overlap, sigma_dim=sigma_dim)
+
 
 def _compute_disk_overlap(d, r1, r2):
     ratio1 = (d**2 + r1**2 - r2**2) / (2 * d * r1)
@@ -97,6 +122,7 @@ def _compute_disk_overlap(d, r1, r2):
     area = r1**2 * acos1 + r2**2 * acos2 - 0.5 * torch.sqrt(torch.abs(a * b * c * d))
     return area / (math.pi * (torch.minimum(r1, r2) ** 2))
 
+
 def blob_overlap(blob1, blob2, *, sigma_dim=1):
     ndim = blob1.shape[-1] - sigma_dim
     if ndim > 3:
@@ -106,8 +132,8 @@ def blob_overlap(blob1, blob2, *, sigma_dim=1):
     blob2_mask = blob1[:, -1] <= blob2[:, -1]
     max_sigma = torch.ones((blob1.shape[0], 1)).to(blob1.device)
 
-    max_sigma[blob1_mask] =blob1[:, -sigma_dim:][blob1_mask]
-    max_sigma[blob2_mask] =blob2[:, -sigma_dim:][blob2_mask]
+    max_sigma[blob1_mask] = blob1[:, -sigma_dim:][blob1_mask]
+    max_sigma[blob2_mask] = blob2[:, -sigma_dim:][blob2_mask]
     r1 = torch.ones((blob1.shape[0])).to(blob1.device)
     r1[blob2_mask] = (blob1[:, -1] / blob2[:, -1])[blob2_mask]
     r2 = torch.ones((blob1.shape[0])).to(blob1.device)
@@ -116,7 +142,7 @@ def blob_overlap(blob1, blob2, *, sigma_dim=1):
     pos1 = blob1[:, :ndim] / (max_sigma * root_ndim)
     pos2 = blob2[:, :ndim] / (max_sigma * root_ndim)
 
-    d = torch.sqrt(torch.sum((pos2 - pos1) ** 2, dim = -1))
+    d = torch.sqrt(torch.sum((pos2 - pos1) ** 2, dim=-1))
 
     output = _compute_disk_overlap(d, r1, r2)
     output[d > r1 + r2] = 0
@@ -124,21 +150,29 @@ def blob_overlap(blob1, blob2, *, sigma_dim=1):
     output[(blob1[:, -1] == 0) * (blob2[:, -1] == 0)] = 0
     return output
 
+
 def _prune_blobs(blobs_array, overlap, *, sigma_dim=1):
     sigma = blobs_array[:, -sigma_dim:].max()
     distance = 2 * sigma * math.sqrt(blobs_array.shape[1] - sigma_dim)
 
     tree = spatial.cKDTree(blobs_array[:, :-sigma_dim].cpu().data.numpy())
 
-    pairs = torch.from_numpy(tree.query_pairs(distance, output_type="ndarray")).to(blobs_array.device)
+    pairs = torch.from_numpy(tree.query_pairs(distance, output_type="ndarray")).to(
+        blobs_array.device
+    )
     if len(pairs) == 0:
         return blobs_array
     else:
         blob1, blob2 = blobs_array[pairs[:, 0], :], blobs_array[pairs[:, 1], :]
         mask = blob_overlap(blob1, blob2, sigma_dim=sigma_dim) > overlap
-        blobs_array[torch.unique(pairs[:, 0][mask * (blob2[:, -1] > blob1[:, -1])]), -1] = 0
-        blobs_array[torch.unique(pairs[:, 1][mask * (blob1[:, -1] > blob2[:, -1])]), -1] = 0
+        blobs_array[
+            torch.unique(pairs[:, 0][mask * (blob2[:, -1] > blob1[:, -1])]), -1
+        ] = 0
+        blobs_array[
+            torch.unique(pairs[:, 1][mask * (blob1[:, -1] > blob2[:, -1])]), -1
+        ] = 0
     return blobs_array[blobs_array[:, -1] != 0, :]
+
 
 def peak_local_max(
     image,
@@ -162,9 +196,7 @@ def peak_local_max(
             stacklevel=2,
         )
 
-    border_width = _get_excluded_border_width(
-        image, min_distance, exclude_border
-    )
+    border_width = _get_excluded_border_width(image, min_distance, exclude_border)
 
     threshold = _get_threshold(image, threshold_abs, threshold_rel)
 
@@ -182,6 +214,7 @@ def peak_local_max(
 
     return coordinates
 
+
 def _get_high_intensity_peaks(image, mask, num_peaks, min_distance, p_norm):
     """
     Return the highest intensity peak coordinates.
@@ -190,20 +223,21 @@ def _get_high_intensity_peaks(image, mask, num_peaks, min_distance, p_norm):
     coord = torch.nonzero(mask)
     intensities = image[coord[:, 0], coord[:, 1], coord[:, 2]]
 
-
     # Highest peak first
     idx_maxsort = torch.argsort(-intensities)
     coord = coord[idx_maxsort, :]
 
-    if np.isfinite(num_peaks):
-        max_out = int(num_peaks)
-    else:
-        max_out = None
+    # TODO: the code below is not used ... If no need any more, remove it.
+    # if np.isfinite(num_peaks):
+    #     max_out = int(num_peaks)
+    # else:
+    #     max_out = None
 
     if len(coord) > num_peaks:
         coord = coord[:num_peaks, :]
 
     return coord
+
 
 def ensure_spacing(
     coords,
@@ -214,10 +248,9 @@ def ensure_spacing(
     *,
     max_split_size=2000,
 ):
-    output = coords
     if len(coords):
         coords = torch.atleast_2d(coords)
-        #coords = coords.cpu().data.numpy()
+        # coords = coords.cpu().data.numpy()
         if not np.isscalar(spacing):
             spacing = spacing.cpu().data.numpy()
 
@@ -229,11 +262,10 @@ def ensure_spacing(
             split_size = min_split_size
             while coord_count - split_idx[-1] > max_split_size:
                 split_size *= 2
-                split_idx.append(
-                    split_idx[-1] + min(split_size, max_split_size)
-                )
+                split_idx.append(split_idx[-1] + min(split_size, max_split_size))
             batch_list = torch.tensor_split(coords, split_idx)
         return torch.vstack(batch_list)
+
 
 def _exclude_border(label, border_width):
     """Set label border values to 0."""
@@ -245,11 +277,16 @@ def _exclude_border(label, border_width):
         label[(slice(None),) * i + (slice(-width, None),)] = 0
     return label
 
+
 def _get_peak_mask(image, segment, footprint, threshold, mask=None):
     if footprint.size == 1 or image.size == 1:
         return image > threshold
-    image_max = F.max_pool3d(image[None, None], kernel_size = footprint.shape, stride = 1,
-                       padding = tuple(np.asarray(footprint.shape)//2))[0, 0]
+    image_max = F.max_pool3d(
+        image[None, None],
+        kernel_size=footprint.shape,
+        stride=1,
+        padding=tuple(np.asarray(footprint.shape) // 2),
+    )[0, 0]
 
     out = image == image_max
 
@@ -259,8 +296,9 @@ def _get_peak_mask(image, segment, footprint, threshold, mask=None):
         out[:] = False
     image = torch.clip(image, torch.quantile(image, 0.1), torch.quantile(image, 0.9))
     threshold = filters.threshold_otsu(image[::2, ::2, :].cpu().data.numpy())
-    out &= (image > threshold)
-    return out*segment[..., None]
+    out &= image > threshold
+    return out * segment[..., None]
+
 
 def _get_threshold(image, threshold_abs, threshold_rel):
     """Return the threshold value according to an absolute and a relative
@@ -273,6 +311,7 @@ def _get_threshold(image, threshold_abs, threshold_rel):
         threshold = max(threshold, threshold_rel * float(image.max()))
     # TODO: return host or device scalar?
     return float(threshold)
+
 
 def _prep_sigmas(ndim, min_sigma, max_sigma):
     # if both min and max sigma are scalar, function returns only one sigma
@@ -294,12 +333,14 @@ def _format_exclude_border(img_ndim, exclude_border):
         if len(exclude_border) != img_ndim:
             raise ValueError(
                 "`exclude_border` should have the same length as the "
-                "dimensionality of the image.")
+                "dimensionality of the image."
+            )
         for exclude in exclude_border:
             if not isinstance(exclude, int):
                 raise ValueError(
                     "exclude border, when expressed as a tuple, must only "
-                    "contain ints.")
+                    "contain ints."
+                )
         return exclude_border
     elif isinstance(exclude_border, int):
         return (exclude_border,) * img_ndim + (0,)
@@ -308,9 +349,7 @@ def _format_exclude_border(img_ndim, exclude_border):
     elif exclude_border is False:
         return (0,) * (img_ndim + 1)
     else:
-        raise ValueError(
-            f'Unsupported value ({exclude_border}) for exclude_border'
-        )
+        raise ValueError(f"Unsupported value ({exclude_border}) for exclude_border")
 
 
 def _get_excluded_border_width(image, min_distance, exclude_border):

@@ -1,33 +1,18 @@
 import torch.nn as nn
 import torch
 import numpy as np
-import math
 import cv2
 from skimage import morphology
 import tqdm
 import struct
 
-try:
-    from skimage import filters
-except ImportError:
-    from skimage import filter as filters
 import scipy
 import copy
 import pandas as pd
 import skimage
 import torch.nn.functional as F
 from scipy import signal
-import shutil
-import gc
-from FUSE.NSCT import NSCTdec, NSCTrec
-import matplotlib.pyplot as plt
-import ants
-import tifffile
 from skimage import measure
-import numpy.ma as ma
-
-import matplotlib.pyplot as plt
-import numpy as np
 
 
 def imagej_metadata_tags(metadata, byteorder):
@@ -195,10 +180,10 @@ def extendBoundary2(
     # window_size = window_size_list[1]
     # poly_order = poly_order_list[1]
 
-    mask_1 = scipy.ndimage.binary_dilation(
-        boundary > 0, structure=np.ones((1, window_size))
-    )
-    boundaryEM = copy.deepcopy(boundary)
+    # mask_1 = scipy.ndimage.binary_dilation(
+    #     boundary > 0, structure=np.ones((1, window_size))
+    # )
+    # boundaryEM = copy.deepcopy(boundary)
     # plt.plot(boundary[28])
     for i in range(boundary.shape[0]):
         tmp = copy.deepcopy(boundary[i, :])
@@ -262,14 +247,14 @@ def extendBoundary(
     spacing,
     _xy,
 ):
-    boundaryEM = copy.deepcopy(boundary)
-    if _xy == True:
+    # boundaryEM = copy.deepcopy(boundary)
+    if _xy is True:
         mask = morphology.binary_dilation(
             boundary != 0, np.ones((1, window_size_list[1]))
         )
         for dim in [1]:
-            window_size = window_size_list[dim]
-            poly_order = poly_order_list[dim]
+            # window_size = window_size_list[dim]
+            # poly_order = poly_order_list[dim]
             for i in range(boundary.shape[0]):
                 p = np.where(boundary[i, :] != 0)[0]
                 if len(p) != 0:
@@ -335,8 +320,10 @@ def EM2DPlus(
             .to(torch.float)
             .to(device)
         )
-        if _xy == True:
-            tmp = copy.deepcopy(min_boundary.cpu().data.numpy())#min_boundary.cpu().data.numpy()
+        if _xy is True:
+            tmp = copy.deepcopy(
+                min_boundary.cpu().data.numpy()
+            )  # min_boundary.cpu().data.numpy()
             tmp[tmp != m1 * 2] = 0
             _, ind = scipy.ndimage.distance_transform_edt(
                 tmp, return_distances=True, return_indices=True, sampling=[1, 1e3]
@@ -344,7 +331,9 @@ def EM2DPlus(
             min_boundary[min_boundary == m1 * 2] = min_boundary[ind[0], ind[1]][
                 min_boundary == m1 * 2
             ]
-            tmp = copy.deepcopy(max_boundary.cpu().data.numpy())#max_boundary.cpu().data.numpy()
+            tmp = copy.deepcopy(
+                max_boundary.cpu().data.numpy()
+            )  # max_boundary.cpu().data.numpy()
             tmp[tmp != -m1 * 2] = 0
             _, ind = scipy.ndimage.distance_transform_edt(
                 tmp, return_distances=True, return_indices=True, sampling=[1, 1e3]
@@ -567,7 +556,7 @@ def EM2DPlus(
     ) = maskfor2d(segMask, window_size, m, s, n)
     boundary0 = torch.argmax(feature, 0).cpu().data.numpy().astype(np.float32)
 
-    tmp = np.arange(m)[:, None, None] > boundary0[None, :, :]
+    # tmp = np.arange(m)[:, None, None] > boundary0[None, :, :]
 
     boundary, _ = missingBoundary(copy.deepcopy(boundary0), s, n)
     if _xy:
@@ -592,7 +581,7 @@ def EM2DPlus(
         [window_size[1] / window_size[0], 1.0],
         _xy=_xy,
     )
-    tmp0 = np.arange(m)[:, None, None] > boundaryLS[None, :, :]
+    # tmp0 = np.arange(m)[:, None, None] > boundaryLS[None, :, :]
     boundary = torch.from_numpy(boundary).to(device)
     boundaryLS = torch.from_numpy(boundaryLS).to(device)
     boundaryOld = copy.deepcopy(boundary)
@@ -791,19 +780,17 @@ def refineShape(segMaskTop, segMaskBottom, topF, bottomF, s, m, n, r, _xy, max_s
         segMask[:, mask_top_l] += temp_bottom[:, mask_top_l]
         _segMask = fillHole(segMask[None])[0]
 
-        _maskl[i] = (
-            _segMask  # scipy.ndimage.binary_erosion(_segMask, np.ones((re*2+1, re*2+1)))
-        )
+        _maskl[i] = _segMask
 
         if i < max(max_seg):
             f = first_nonzero(None, _segMask, axis=0, invalid_val=0)
-            l = last_nonzero(None, _segMask, axis=0, invalid_val=m - 1)
+            ll = last_nonzero(None, _segMask, axis=0, invalid_val=m - 1)
 
             bottom_labeled = measure.label(temp_bottom, connectivity=2)
             top_labeled = measure.label(temp_top, connectivity=2)
 
             boundary_top_ind = top_labeled[f, np.arange(n)]
-            boundary_bottom_ind = bottom_labeled[l, np.arange(n)]
+            boundary_bottom_ind = bottom_labeled[ll, np.arange(n)]
 
             boundary_patch_bottom = bottom_labeled == boundary_bottom_ind[None, :]
             boundary_patch_top = top_labeled == boundary_top_ind[None, :]
@@ -873,9 +860,7 @@ def refineShape(segMaskTop, segMaskBottom, topF, bottomF, s, m, n, r, _xy, max_s
             segMask[:, mask_top_l] += temp_bottom[:, mask_top_l]
             segMask = fillHole(segMask[None])[0] * _segMask
 
-            _maskm[i] = (
-                segMask  # scipy.ndimage.binary_erosion(segMask, np.ones((re*2+1, re*2+1)))
-            )
+            _maskm[i] = segMask
         else:
             pass
     t = (np.arange(s)[:, None] >= np.array(max_seg)[None, :])[:, None, :].repeat(m, 1)
@@ -884,7 +869,7 @@ def refineShape(segMaskTop, segMaskBottom, topF, bottomF, s, m, n, r, _xy, max_s
     if max(max_seg) > 0:
         for i in tqdm.tqdm(range(0, s), desc="refine pair-wise segmentation result: "):
             _mask[i] += outlierFilling(_mask[i])
-    if _xy == False:
+    if _xy is False:
         return fillHole(_mask.transpose(1, 2, 0))
     else:
         _mask_small_tmp = _mask[:, :-1:2, :-1:2]
@@ -954,7 +939,7 @@ def fillHole(segMask):
 
 
 def sgolay2dkernel(window_size, order):
-    n_terms = (order + 1) * (order + 2) / 2.0
+    # n_terms = (order + 1) * (order + 2) / 2.0
     half_size = window_size // 2
     exps = []
     for row in range(order[0] + 1):

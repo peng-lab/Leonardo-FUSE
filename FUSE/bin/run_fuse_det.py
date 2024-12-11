@@ -11,7 +11,6 @@ import logging
 import sys
 import traceback
 
-from pathlib import Path
 from FUSE import FUSE_det, get_module_version
 
 ###############################################################################
@@ -304,7 +303,7 @@ def main():
             args.destripe_params,
             args.device,
         )
-        out = exe.train(
+        exe.train(
             args.require_registration,
             args.require_flipping_along_illu_for_dorsaldet,
             args.require_flipping_along_det_for_dorsaldet,
