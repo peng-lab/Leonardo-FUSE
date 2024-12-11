@@ -1,14 +1,6 @@
-name: Build Main
+name: Test and Lint
 
-on:
-  push:
-    branches:
-      - main
-  schedule:
-    # <minute [0,59]> <hour [0,23]> <day of the month [1,31]> <month of the year [1,12]> <day of the week [0,6]>
-    # https://pubs.opengroup.org/onlinepubs/9699919799/utilities/crontab.html#tag_20_25_07
-    # Run every Monday at 18:00:00 UTC (Monday at 10:00:00 PST)
-    - cron: '0 18 1 * *'
+on: pull_request
 
 jobs:
   test:
@@ -30,7 +22,7 @@ jobs:
         pip install .[test] --verbose
     - name: Test with pytest
       run: |
-        pytest --cov-report xml --cov=FUSE FUSE/tests/
+        pytest lsfm_destripe/tests/
     - name: Upload codecov
       uses: codecov/codecov-action@v1
 
@@ -49,31 +41,7 @@ jobs:
         pip install .[test] --verbose
     - name: Lint with flake8
       run: |
-        flake8 FUSE --count --verbose --show-source --statistics
+        flake8 lsfm_destripe --count --verbose --show-source --statistics
     - name: Check with black
       run: |
-        black --check FUSE
-
-  publish:
-    if: "contains(github.event.head_commit.message, 'Bump version')"
-    # needs: [test, lint]
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.9
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install setuptools wheel
-    - name: Build Package
-      run: |
-        python setup.py sdist bdist_wheel
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@master
-      with:
-        user: __token__
-        password: ${{ secrets.PYPI_TOKEN }}
+        black --check lsfm_destripe
