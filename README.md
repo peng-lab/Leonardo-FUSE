@@ -1,8 +1,6 @@
 # Leonardo-FUSE (LSFM Fusion in Python)
 
-[![Build Status](https://github.com/peng-lab/LSFM-fusion/workflows/Build%20Main/badge.svg)](https://github.com/peng-lab/LSFM-fusion/actions)
-[![Documentation](https://github.com/peng-lab/LSFM-fusion/workflows/Documentation/badge.svg)](https://peng-lab.github.io/LSFM-fusion/)
-[![Code Coverage](https://codecov.io/gh/peng-lab/LSFM-fusion/branch/main/graph/badge.svg)](https://codecov.io/gh/peng-lab/LSFM-fusion)
+[![Build Status](https://github.com/peng-lab/Leonardo-FUSE/workflows/Build%20Main/badge.svg)](https://github.com/peng-lab/Leonardo-FUSE/actions)
 
 A Python implementation of LSFM fusion method (former BigFUSE)
 
@@ -269,12 +267,9 @@ usage: run_fuse_det --data_path
 
 ## Installation
 
-**Stable Release:** `pip install lsfm_fuse`<br>
-**Development Head:** `pip install git+https://github.com/peng-lab/LSFM-fusion.git`
+**Stable Release:** `pip install FUSE`<br>
+**Development Head:** `pip install git+https://github.com/peng-lab/Leonardo-FUSE.git`
 
-## Documentation
-
-For full package documentation please visit [peng-lab.github.io/lsfm_destripe](https://peng-lab.github.io/LSFM-fusion).
 
 ## Development
 
