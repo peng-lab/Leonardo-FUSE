@@ -833,7 +833,7 @@ def refineShape(segMaskTop, segMaskBottom, topF, bottomF, s, m, n, r, _xy, max_s
             segMask[:, mask_top_l] += temp_bottom[:, mask_top_l]
             segMask = fillHole(segMask[None])[0] * _segMask
 
-            _maskm[i] = segMask  
+            _maskm[i] = segMask
         else:
             pass
     t = (np.arange(s)[:, None] >= np.array(max_seg)[None, :])[:, None, :].repeat(m, 1)
