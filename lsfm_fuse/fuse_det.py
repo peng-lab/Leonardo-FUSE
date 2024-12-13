@@ -770,7 +770,7 @@ class FUSE_det:
 
         data_path = os.path.join(data_path, sample_name)
         if require_registration:
-            if self.registration_params["use_exist_reg"] == False:
+            if self.registration_params["use_exist_reg"] is False:
                 run_coarse = 1
                 if self.registration_params["require_reg_finetune"]:
                     run_fine = 1
@@ -2782,7 +2782,7 @@ def fusionResult(
     GFr[1] = GFr[1] // 4 * 2 + 1
     boundary = mask > boundary
 
-    l = np.concatenate(
+    l_temp = np.concatenate(
         (
             np.zeros(GFr[0] // 2, dtype=np.int32),
             np.arange(s),
@@ -2793,9 +2793,9 @@ def fusionResult(
     recon = np.zeros(bottomVol.shape, dtype=np.uint16)
 
     for ii in tqdm.tqdm(
-        range(GFr[0] // 2, len(l) - GFr[0] // 2), desc="fusion: "
+        range(GFr[0] // 2, len(l_temp) - GFr[0] // 2), desc="fusion: "
     ):  # topVol.shape[0]
-        l_s = l[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
+        l_s = l_temp[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
 
         bottomMask = torch.from_numpy(boundary[:, l_s, :, :]).to(device).to(torch.float)
         topMask = torch.from_numpy((~boundary[:, l_s, :, :])).to(device).to(torch.float)
@@ -2875,17 +2875,17 @@ def fusionResultFour(
             ),
             0,
         )
-    mask_front = mask > boundaryFront[:, None, :]  ###1是下面，0是上面
+    mask_front = mask > boundaryFront[:, None, :]  # 1是下面，0是上面
     if boundaryBack.ndim == 2:
         mask_back = mask > boundaryBack[:, None, :]
     else:
         mask_back = boundaryBack
     mask_ztop = (
         np.arange(s)[:, None, None] > boundaryTop[None, :, :]
-    )  ###1是后面，0是前面
+    )  # ##1是后面，0是前面
     mask_zbottom = (
         np.arange(s)[:, None, None] > boundaryBottom[None, :, :]
-    )  ###1是后面，0是前面
+    )  # ##1是后面，0是前面
 
     listPair1 = {"1": "4", "2": "3", "4": "1", "3": "2"}
     reconVol = np.empty(illu_back.shape, dtype=np.uint16)
@@ -2897,9 +2897,9 @@ def fusionResultFour(
     boundary_mask = np.zeros((s, m, n), dtype=bool)
     volmin = 65535
 
-    for l in allList:
+    for ll in allList:
         volmin = min(
-            np.load(os.path.join(info_path, l, "info.npy"), allow_pickle=True).item()[
+            np.load(os.path.join(info_path, ll, "info.npy"), allow_pickle=True).item()[
                 "minvol"
             ],
             volmin,
@@ -2928,10 +2928,10 @@ def fusionResultFour(
 
         List = np.zeros((5, 1, m, n), dtype=np.float32)
 
-        tmp1 = (mask_front[ii] == 0) * (mask_ztop[ii] == 0)  ###top+front
-        tmp2 = (mask_front[ii] == 1) * (mask_zbottom[ii] == 0)  ###bottom+front
-        tmp3 = (mask_back[ii] == 0) * (mask_ztop[ii] == 1)  ###top+back
-        tmp4 = (mask_back[ii] == 1) * (mask_zbottom[ii] == 1)  ###bottom+back
+        tmp1 = (mask_front[ii] == 0) * (mask_ztop[ii] == 0)  # ##top+front
+        tmp2 = (mask_front[ii] == 1) * (mask_zbottom[ii] == 0)  # ##bottom+front
+        tmp3 = (mask_back[ii] == 0) * (mask_ztop[ii] == 1)  # ##top+back
+        tmp4 = (mask_back[ii] == 1) * (mask_zbottom[ii] == 1)  # ##bottom+back
 
         vnameList = ["1", "2", "3", "4"]
 
@@ -3026,7 +3026,7 @@ def fusionResultFour(
     if s_f < s_b:
         illu_front = np.concatenate((illu_front, illu_back[-(s_b - s_f) :, :, :]), 0)
 
-    l = np.concatenate(
+    l_temp = np.concatenate(
         (
             np.arange(GFr[0] // 2, 0, -1),
             np.arange(s),
@@ -3035,8 +3035,8 @@ def fusionResultFour(
         0,
     )
 
-    for ii in tqdm.tqdm(range(2, len(l) - 2), desc="fusion: "):  # topVol.shape[0]
-        l_s = l[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
+    for ii in tqdm.tqdm(range(2, len(l_temp) - 2), desc="fusion: "):  # topVol.shape[0]
+        l_s = l_temp[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
 
         bottomMask = 1 - boundary_mask[None, l_s, :, :]
         topMask = boundary_mask[None, l_s, :, :]

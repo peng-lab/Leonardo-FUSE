@@ -806,7 +806,7 @@ def fusionResult(
     mask = torch.arange(m, device=device)[None, None, :, None]
     GFr[1] = GFr[1] // 4 * 2 + 1
 
-    l = np.concatenate(
+    l_temp = np.concatenate(
         (
             np.arange(GFr[0] // 2, 0, -1),
             np.arange(s),
@@ -817,9 +817,9 @@ def fusionResult(
     recon = np.zeros(topVol.shape, dtype=np.uint16)
 
     for ii in tqdm.tqdm(
-        range(GFr[0] // 2, len(l) - GFr[0] // 2), desc="fusion: "
+        range(GFr[0] // 2, len(l_temp) - GFr[0] // 2), desc="fusion: "
     ):  # topVol.shape[0]
-        l_s = l[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
+        l_s = l_temp[ii - GFr[0] // 2 : ii + GFr[0] // 2 + 1]
         boundary_slice = boundary[:, l_s, :, :]
 
         bottomMask = (mask > boundary_slice).to(torch.float)
