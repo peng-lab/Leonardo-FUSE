@@ -5,7 +5,6 @@ import cv2
 from skimage import morphology
 import tqdm
 import struct
-
 import scipy
 import copy
 import pandas as pd
@@ -71,50 +70,24 @@ def imagej_metadata_tags(metadata, byteorder):
     )
 
 
-def fusion_perslice(topSlice, bottomSlice, topMask, bottomMask, GFr, device):
-    n, c, m, n = topSlice.shape
+def fusion_perslice(x, mask, GFr, device):
+    n, c, m, n = x.shape
     GF = GuidedFilter(r=GFr, eps=1)
-    topSlice = torch.from_numpy(topSlice).to(device)
-    bottomSlice = torch.from_numpy(bottomSlice).to(device)
-    if isinstance(topMask, np.ndarray):
-        topMask = torch.from_numpy(topMask).to(device).to(torch.float)
-        bottomMask = torch.from_numpy(bottomMask).to(device).to(torch.float)
+    x = torch.from_numpy(x).to(device)
+    if isinstance(mask, np.ndarray):
+        mask = torch.from_numpy(mask).to(device).to(torch.float)
 
-    result0, num0 = GF(bottomSlice, bottomMask)
-    result1, num1 = GF(topSlice, topMask)
-
-    num0 = num0 == (2 * GFr[1] + 1) * (2 * GFr[1] + 1) * GFr[0]
-    num1 = num1 == (2 * GFr[1] + 1) * (2 * GFr[1] + 1) * GFr[0]
-
-    result0[num0] = 1
-    result1[num1] = 1
-
-    result0[num1] = 0
-    result1[num0] = 0
-
-    t = result0 + result1
-
-    result0, result1 = result0 / t, result1 / t
-
-    minn, maxx = min(topSlice.min(), bottomSlice.min()), max(
-        topSlice.max(), bottomSlice.max()
-    )
-
-    bottom_seg = (
-        result0 * bottomSlice[:, c // 2 : c // 2 + 1, :, :]
-    )  # + result0detail * bottomDetail
-    top_seg = (
-        result1 * topSlice[:, c // 2 : c // 2 + 1, :, :]
-    )  # + result1detail * topDetail
-
-    result = torch.clip(bottom_seg + top_seg, minn, maxx)
-    bottom_seg = torch.clip(bottom_seg, bottomSlice.min(), bottomSlice.max())
-    top_seg = torch.clip(top_seg, topSlice.min(), topSlice.max())
+    result, num = GF(x, mask)
+    num = num == (2 * GFr[1] + 1) * (2 * GFr[1] + 1) * GFr[0]
+    result[num] = 1
+    result = result / result.sum(0, keepdim=True)
+    minn, maxx = x.min(), x.max()
+    y_seg = x[:, c // 2 : c // 2 + 1, :, :] * result
+    y = torch.clip(y_seg.sum(0), minn, maxx)
 
     return (
-        result.squeeze().cpu().data.numpy().astype(np.uint16),
-        top_seg.squeeze().cpu().data.numpy().astype(np.uint16),
-        bottom_seg.squeeze().cpu().data.numpy().astype(np.uint16),
+        y.squeeze().cpu().data.numpy().astype(np.uint16),
+        result.squeeze().cpu().data.numpy(),
     )
 
 
@@ -784,13 +757,13 @@ def refineShape(segMaskTop, segMaskBottom, topF, bottomF, s, m, n, r, _xy, max_s
 
         if i < max(max_seg):
             f = first_nonzero(None, _segMask, axis=0, invalid_val=0)
-            ll = last_nonzero(None, _segMask, axis=0, invalid_val=m - 1)
+            l_temp = last_nonzero(None, _segMask, axis=0, invalid_val=m - 1)
 
             bottom_labeled = measure.label(temp_bottom, connectivity=2)
             top_labeled = measure.label(temp_top, connectivity=2)
 
             boundary_top_ind = top_labeled[f, np.arange(n)]
-            boundary_bottom_ind = bottom_labeled[ll, np.arange(n)]
+            boundary_bottom_ind = bottom_labeled[l_temp, np.arange(n)]
 
             boundary_patch_bottom = bottom_labeled == boundary_bottom_ind[None, :]
             boundary_patch_top = top_labeled == boundary_top_ind[None, :]
